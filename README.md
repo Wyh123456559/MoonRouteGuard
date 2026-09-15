@@ -17,6 +17,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - correct handling of overlapping VRPs where any authorizing payload makes the
   route valid;
 - Routinator `csv` and quoted `csvcompat` VRP input with trust-anchor labels;
+- deterministic Routinator `csv` and `csvcompat` output with round-trip safety;
 - recoverable, line-numbered diagnostics for malformed or unsupported rows;
 - set-based comparison of complete VRP snapshots, including trust-anchor
   changes, duplicate suppression, and hash-indexed membership checks;
@@ -72,6 +73,18 @@ The accepted four-column layout follows Routinator's documented
 [`csv` and `csvcompat` formats](https://routinator.docs.nlnetlabs.nl/en/stable/output-formats.html).
 The current parser reports IPv6 rows as unsupported instead of silently
 discarding them.
+
+Parsed records can be written back in either Routinator layout:
+
+```moonbit
+let output = @moonrouteguard.write_vrp_csv(
+  parsed.records,
+  @moonrouteguard.RoutinatorCsvCompat,
+).unwrap()
+```
+
+The writer preserves record order, uses LF line endings, escapes CSV fields,
+and rejects trust-anchor labels that cannot round trip through the parser.
 
 Two parsed snapshots can be compared before a validator update is deployed:
 

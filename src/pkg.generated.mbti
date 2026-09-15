@@ -22,6 +22,8 @@ pub fn validate_route(RouteAnnouncement, Array[Vrp]) -> ValidationDecision
 
 pub fn validate_routes(Array[RouteAnnouncement], Array[Vrp]) -> Array[ValidationDecision]
 
+pub fn write_vrp_csv(Array[VrpRecord], VrpCsvStyle) -> Result[String, String]
+
 // Errors
 
 // Types and methods
@@ -123,6 +125,11 @@ pub(all) struct VrpCsvResult {
   diagnostics : Array[CsvDiagnostic]
 } derive(Eq, @debug.Debug)
 pub fn VrpCsvResult::is_valid(Self) -> Bool
+
+pub(all) enum VrpCsvStyle {
+  RoutinatorCsv
+  RoutinatorCsvCompat
+} derive(Eq, @debug.Debug)
 
 pub struct VrpIndex {
   buckets : Array[Map[UInt, Array[Int]]]
