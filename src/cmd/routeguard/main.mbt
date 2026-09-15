@@ -14,6 +14,7 @@ fn main {
   )
   println("VRP snapshot: \{snapshot_diff.summary()}")
   let vrps = parsed.records.map(record => record.vrp)
+  let index = @moonrouteguard.VrpIndex::new(vrps)
   let routes = [
     @moonrouteguard.RouteAnnouncement::new(
       @moonrouteguard.Ipv4Prefix::parse("203.0.113.0/24").unwrap(),
@@ -28,7 +29,7 @@ fn main {
       64497U,
     ),
   ]
-  for decision in @moonrouteguard.validate_routes(routes, vrps) {
+  for decision in index.validate_all(routes) {
     println(decision.summary())
   }
 }

@@ -21,6 +21,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - set-based comparison of complete VRP snapshots, including trust-anchor
   changes and duplicate suppression;
 - order-preserving batch route validation;
+- indexed validation with at most 33 prefix-key lookups per IPv4 route;
 - portable library code without filesystem or network dependencies.
 
 ## Example
@@ -79,11 +80,21 @@ println(diff.summary()) // +12 -3 (148921 unchanged)
 The comparison treats exact VRP records as set members. Changes to a prefix,
 ASN, maximum length, or trust anchor appear as one removal and one addition.
 
+For repeated checks, build an index once from a complete VRP snapshot:
+
+```moonbit
+let vrps = current.records.map(record => record.vrp)
+let index = @moonrouteguard.VrpIndex::new(vrps)
+let decision = index.validate(route)
+```
+
+Indexed validation returns the same ordered evidence as the linear API while
+avoiding a complete VRP scan for every route.
+
 ## Next steps
 
-Planned work includes IPv6 prefixes, indexed prefix lookup, SLURM local
-overrides, and RPKI-to-Router PDU support. These capabilities are not part of
-the current release.
+Planned work includes IPv6 prefixes, SLURM local overrides, and RPKI-to-Router
+PDU support. These capabilities are not part of the current release.
 
 ## License
 

@@ -76,6 +76,15 @@ pub(all) struct VrpCsvResult {
 } derive(Eq, @debug.Debug)
 pub fn VrpCsvResult::is_valid(Self) -> Bool
 
+pub struct VrpIndex {
+  buckets : Array[Map[UInt, Array[Int]]]
+  vrps : Array[Vrp]
+}
+pub fn VrpIndex::length(Self) -> Int
+pub fn VrpIndex::new(Array[Vrp]) -> Self
+pub fn VrpIndex::validate(Self, RouteAnnouncement) -> ValidationDecision
+pub fn VrpIndex::validate_all(Self, Array[RouteAnnouncement]) -> Array[ValidationDecision]
+
 pub(all) struct VrpMatch {
   vrp : Vrp
   relation : VrpRelation
