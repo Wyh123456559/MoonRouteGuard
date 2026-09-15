@@ -95,6 +95,8 @@ pub(all) struct VrpRecord {
   trust_anchor : String
 } derive(Eq, @debug.Debug)
 
+type VrpRecordKey derive(Eq, Hash)
+
 pub(all) enum VrpRelation {
   Authorizes
   AsnMismatch

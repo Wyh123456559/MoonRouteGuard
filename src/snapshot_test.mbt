@@ -91,3 +91,20 @@ test "preserve source order in change lists" {
   assert_eq(diff.removed[0].vrp.asn(), 64501U)
   assert_eq(diff.removed[1].vrp.asn(), 64500U)
 }
+
+///|
+test "compare a large unchanged snapshot" {
+  let records : Array[VrpRecord] = []
+  for address = 0; address < 5000; address = address + 1 {
+    let third = address / 256
+    let fourth = address % 256
+    let prefix = Ipv4Prefix::parse("0.0.\{third}.\{fourth}/32").unwrap()
+    records.push({
+      vrp: Vrp::new(prefix, 32, 64496U).unwrap(),
+      trust_anchor: "testbed",
+    })
+  }
+  let diff = compare_snapshots(records, records)
+  assert_eq(diff.is_empty(), true)
+  assert_eq(diff.unchanged, 5000)
+}

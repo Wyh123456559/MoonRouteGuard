@@ -20,24 +20,46 @@ pub fn SnapshotDiff::summary(self : SnapshotDiff) -> String {
 }
 
 ///|
-fn contains_record(records : Array[VrpRecord], candidate : VrpRecord) -> Bool {
-  for record in records {
-    if record == candidate {
-      return true
-    }
+struct VrpRecordKey {
+  address : UInt
+  prefix_length : Int
+  max_length : Int
+  asn : UInt
+  trust_anchor : String
+} derive(Eq, Hash)
+
+///|
+fn VrpRecord::key(self : VrpRecord) -> VrpRecordKey {
+  {
+    address: self.vrp.prefix().address,
+    prefix_length: self.vrp.prefix().length(),
+    max_length: self.vrp.max_length(),
+    asn: self.vrp.asn(),
+    trust_anchor: self.trust_anchor,
   }
-  false
 }
 
 ///|
 fn unique_records(records : Array[VrpRecord]) -> Array[VrpRecord] {
   let unique : Array[VrpRecord] = []
+  let seen : Map[VrpRecordKey, Unit] = Map([], capacity=records.length())
   for record in records {
-    if !contains_record(unique, record) {
+    let key = record.key()
+    if !seen.contains(key) {
+      seen.set(key, ())
       unique.push(record)
     }
   }
   unique
+}
+
+///|
+fn record_keys(records : Array[VrpRecord]) -> Map[VrpRecordKey, Unit] {
+  let keys : Map[VrpRecordKey, Unit] = Map([], capacity=records.length())
+  for record in records {
+    keys.set(record.key(), ())
+  }
+  keys
 }
 
 ///|
@@ -52,18 +74,20 @@ pub fn compare_snapshots(
 ) -> SnapshotDiff {
   let before = unique_records(previous)
   let after = unique_records(current)
+  let before_keys = record_keys(before)
+  let after_keys = record_keys(after)
   let added : Array[VrpRecord] = []
   let removed : Array[VrpRecord] = []
   let mut unchanged = 0
   for record in after {
-    if contains_record(before, record) {
+    if before_keys.contains(record.key()) {
       unchanged = unchanged + 1
     } else {
       added.push(record)
     }
   }
   for record in before {
-    if !contains_record(after, record) {
+    if !after_keys.contains(record.key()) {
       removed.push(record)
     }
   }

@@ -19,7 +19,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - Routinator `csv` and quoted `csvcompat` VRP input with trust-anchor labels;
 - recoverable, line-numbered diagnostics for malformed or unsupported rows;
 - set-based comparison of complete VRP snapshots, including trust-anchor
-  changes and duplicate suppression;
+  changes, duplicate suppression, and hash-indexed membership checks;
 - order-preserving batch route validation;
 - indexed validation with at most 33 prefix-key lookups per IPv4 route;
 - portable library code without filesystem or network dependencies.
@@ -77,8 +77,9 @@ let diff = @moonrouteguard.compare_snapshots(old.records, current.records)
 println(diff.summary()) // +12 -3 (148921 unchanged)
 ```
 
-The comparison treats exact VRP records as set members. Changes to a prefix,
-ASN, maximum length, or trust anchor appear as one removal and one addition.
+The comparison runs in expected linear time and treats exact VRP records as set
+members. Changes to a prefix, ASN, maximum length, or trust anchor appear as one
+removal and one addition.
 
 For repeated checks, build an index once from a complete VRP snapshot:
 
