@@ -1,9 +1,18 @@
 ///|
 fn main {
-  let csv =
+  let previous_csv =
     #|ASN,IP Prefix,Max Length,Trust Anchor
     #|AS64496,203.0.113.0/24,24,arin
-  let parsed = @moonrouteguard.parse_vrp_csv(csv)
+  let current_csv =
+    #|ASN,IP Prefix,Max Length,Trust Anchor
+    #|AS64496,203.0.113.0/24,26,arin
+  let previous = @moonrouteguard.parse_vrp_csv(previous_csv)
+  let parsed = @moonrouteguard.parse_vrp_csv(current_csv)
+  let snapshot_diff = @moonrouteguard.compare_snapshots(
+    previous.records,
+    parsed.records,
+  )
+  println("VRP snapshot: \{snapshot_diff.summary()}")
   let vrps = parsed.records.map(record => record.vrp)
   let routes = [
     @moonrouteguard.RouteAnnouncement::new(

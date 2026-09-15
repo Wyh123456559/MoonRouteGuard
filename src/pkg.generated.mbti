@@ -6,6 +6,8 @@ import {
 }
 
 // Values
+pub fn compare_snapshots(Array[VrpRecord], Array[VrpRecord]) -> SnapshotDiff
+
 pub fn parse_vrp_csv(StringView) -> VrpCsvResult
 
 pub fn validate_route(RouteAnnouncement, Array[Vrp]) -> ValidationDecision
@@ -42,6 +44,14 @@ pub(all) enum RouteValidity {
   Invalid
   NotFound
 } derive(Eq, @debug.Debug)
+
+pub(all) struct SnapshotDiff {
+  added : Array[VrpRecord]
+  removed : Array[VrpRecord]
+  unchanged : Int
+} derive(Eq, @debug.Debug)
+pub fn SnapshotDiff::is_empty(Self) -> Bool
+pub fn SnapshotDiff::summary(Self) -> String
 
 pub(all) struct ValidationDecision {
   route : RouteAnnouncement

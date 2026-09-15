@@ -18,6 +18,8 @@ implementation. Applications provide VRPs obtained from a trusted validator.
   route valid;
 - Routinator `csv` and quoted `csvcompat` VRP input with trust-anchor labels;
 - recoverable, line-numbered diagnostics for malformed or unsupported rows;
+- set-based comparison of complete VRP snapshots, including trust-anchor
+  changes and duplicate suppression;
 - order-preserving batch route validation;
 - portable library code without filesystem or network dependencies.
 
@@ -67,11 +69,21 @@ The accepted four-column layout follows Routinator's documented
 The current parser reports IPv6 rows as unsupported instead of silently
 discarding them.
 
+Two parsed snapshots can be compared before a validator update is deployed:
+
+```moonbit
+let diff = @moonrouteguard.compare_snapshots(old.records, current.records)
+println(diff.summary()) // +12 -3 (148921 unchanged)
+```
+
+The comparison treats exact VRP records as set members. Changes to a prefix,
+ASN, maximum length, or trust anchor appear as one removal and one addition.
+
 ## Next steps
 
-Planned work includes IPv6 prefixes, indexed prefix lookup, snapshot comparison,
-SLURM local overrides, and RPKI-to-Router PDU support. These capabilities are
-not part of the current release.
+Planned work includes IPv6 prefixes, indexed prefix lookup, SLURM local
+overrides, and RPKI-to-Router PDU support. These capabilities are not part of
+the current release.
 
 ## License
 
