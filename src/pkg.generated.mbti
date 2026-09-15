@@ -6,11 +6,15 @@ import {
 }
 
 // Values
+pub fn apply_slurm(Array[Vrp], Array[SlurmPrefixFilter], Array[Vrp]) -> SlurmApplyResult
+
 pub fn assess_snapshot_impact(Array[RouteAnnouncement], Array[Vrp], Array[Vrp]) -> SnapshotImpact
 
 pub fn compare_snapshots(Array[VrpRecord], Array[VrpRecord]) -> SnapshotDiff
 
 pub fn parse_vrp_csv(StringView) -> VrpCsvResult
+
+pub fn slurm_assertion(Ipv4Prefix, UInt, max_length? : Int) -> Result[Vrp, String]
 
 pub fn validate_route(RouteAnnouncement, Array[Vrp]) -> ValidationDecision
 
@@ -52,6 +56,27 @@ pub(all) enum RouteValidity {
   Invalid
   NotFound
 } derive(Eq, @debug.Debug)
+
+pub(all) struct SlurmApplyResult {
+  vrps : Array[Vrp]
+  filtered : Int
+  duplicate_assertions : Int
+} derive(Eq, @debug.Debug)
+pub fn SlurmApplyResult::summary(Self) -> String
+
+pub struct SlurmPrefixFilter {
+  prefix : Ipv4Prefix?
+  asn : UInt?
+  comment : String
+} derive(Eq, @debug.Debug)
+pub fn SlurmPrefixFilter::asn(Self) -> UInt?
+pub fn SlurmPrefixFilter::by_asn(UInt, comment? : String) -> Self
+pub fn SlurmPrefixFilter::by_prefix(Ipv4Prefix, comment? : String) -> Self
+pub fn SlurmPrefixFilter::by_prefix_and_asn(Ipv4Prefix, UInt, comment? : String) -> Self
+pub fn SlurmPrefixFilter::comment(Self) -> String
+pub fn SlurmPrefixFilter::prefix(Self) -> Ipv4Prefix?
+
+type SlurmVrpKey derive(Eq, Hash)
 
 pub(all) struct SnapshotDiff {
   added : Array[VrpRecord]

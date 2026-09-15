@@ -23,6 +23,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - order-preserving batch route validation;
 - indexed validation with at most 33 prefix-key lookups per IPv4 route;
 - route-impact analysis across VRP snapshots with old and new evidence;
+- RFC 8416 IPv4 prefix filters and locally added assertions;
 - portable library code without filesystem or network dependencies.
 
 ## Example
@@ -110,10 +111,26 @@ The impact report includes only validity transitions and retains both complete
 decisions as evidence. Routes whose evidence changes without changing their
 validation state are counted as unchanged.
 
+Local SLURM policy can be applied before building a validation index:
+
+```moonbit
+let filter = @moonrouteguard.SlurmPrefixFilter::by_asn(64496U)
+let assertion = @moonrouteguard.slurm_assertion(prefix, 64500U).unwrap()
+let local = @moonrouteguard.apply_slurm(payloads, [filter], [assertion])
+let index = @moonrouteguard.VrpIndex::new(local.vrps)
+```
+
+The implementation follows [RFC 8416](https://www.rfc-editor.org/rfc/rfc8416.html)
+ordering: filters apply to validated RPKI output first, then local assertions
+are appended without exact duplicates. Prefix-only, ASN-only, and combined
+prefix-and-ASN filters are supported. JSON SLURM file parsing and BGPsec rules
+are not implemented yet.
+
 ## Next steps
 
-Planned work includes IPv6 prefixes, SLURM local overrides, and RPKI-to-Router
-PDU support. These capabilities are not part of the current release.
+Planned work includes IPv6 prefixes, JSON SLURM file parsing, BGPsec SLURM
+rules, and RPKI-to-Router PDU support. These capabilities are not part of the
+current release.
 
 ## License
 
