@@ -1,0 +1,5 @@
+import {
+  "Wyh123456559/moonrouteguard",
+}
+
+pkgtype(kind: "executable")

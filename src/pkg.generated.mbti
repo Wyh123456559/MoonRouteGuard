@@ -1,0 +1,68 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Wyh123456559/moonrouteguard"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn validate_route(RouteAnnouncement, Array[Vrp]) -> ValidationDecision
+
+// Errors
+
+// Types and methods
+pub struct Ipv4Prefix {
+  address : UInt
+  length : Int
+} derive(Eq, @debug.Debug)
+pub fn Ipv4Prefix::covers(Self, Self) -> Bool
+pub fn Ipv4Prefix::length(Self) -> Int
+pub fn Ipv4Prefix::parse(StringView) -> Result[Self, String]
+pub fn Ipv4Prefix::to_string(Self) -> String
+
+pub struct RouteAnnouncement {
+  prefix : Ipv4Prefix
+  origin_asn : UInt
+} derive(Eq, @debug.Debug)
+pub fn RouteAnnouncement::new(Ipv4Prefix, UInt) -> Self
+pub fn RouteAnnouncement::origin_asn(Self) -> UInt
+pub fn RouteAnnouncement::prefix(Self) -> Ipv4Prefix
+
+pub(all) enum RouteValidity {
+  Valid
+  Invalid
+  NotFound
+} derive(Eq, @debug.Debug)
+
+pub(all) struct ValidationDecision {
+  route : RouteAnnouncement
+  validity : RouteValidity
+  matches : Array[VrpMatch]
+} derive(Eq, @debug.Debug)
+pub fn ValidationDecision::summary(Self) -> String
+
+pub struct Vrp {
+  prefix : Ipv4Prefix
+  max_length : Int
+  asn : UInt
+} derive(Eq, @debug.Debug)
+pub fn Vrp::asn(Self) -> UInt
+pub fn Vrp::max_length(Self) -> Int
+pub fn Vrp::new(Ipv4Prefix, Int, UInt) -> Result[Self, String]
+pub fn Vrp::prefix(Self) -> Ipv4Prefix
+
+pub(all) struct VrpMatch {
+  vrp : Vrp
+  relation : VrpRelation
+} derive(Eq, @debug.Debug)
+
+pub(all) enum VrpRelation {
+  Authorizes
+  AsnMismatch
+  LengthExceeded
+  AsnAndLengthMismatch
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

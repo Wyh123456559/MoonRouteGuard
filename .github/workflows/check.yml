@@ -1,0 +1,31 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  moonbit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [wasm, wasm-gc, js]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-moonbit@v1
+      - run: moon check --target ${{ matrix.target }} --deny-warn
+      - run: moon test --target ${{ matrix.target }} --deny-warn
+
+  formatting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-moonbit@v1
+      - run: moon fmt
+      - run: git diff --exit-code
+      - run: moon info
+      - run: git diff --exit-code
