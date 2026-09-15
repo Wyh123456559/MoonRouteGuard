@@ -6,6 +6,8 @@ import {
 }
 
 // Values
+pub fn assess_snapshot_impact(Array[RouteAnnouncement], Array[Vrp], Array[Vrp]) -> SnapshotImpact
+
 pub fn compare_snapshots(Array[VrpRecord], Array[VrpRecord]) -> SnapshotDiff
 
 pub fn parse_vrp_csv(StringView) -> VrpCsvResult
@@ -39,6 +41,12 @@ pub fn RouteAnnouncement::new(Ipv4Prefix, UInt) -> Self
 pub fn RouteAnnouncement::origin_asn(Self) -> UInt
 pub fn RouteAnnouncement::prefix(Self) -> Ipv4Prefix
 
+pub(all) struct RouteImpact {
+  previous : ValidationDecision
+  current : ValidationDecision
+} derive(Eq, @debug.Debug)
+pub fn RouteImpact::summary(Self) -> String
+
 pub(all) enum RouteValidity {
   Valid
   Invalid
@@ -52,6 +60,13 @@ pub(all) struct SnapshotDiff {
 } derive(Eq, @debug.Debug)
 pub fn SnapshotDiff::is_empty(Self) -> Bool
 pub fn SnapshotDiff::summary(Self) -> String
+
+pub(all) struct SnapshotImpact {
+  changed : Array[RouteImpact]
+  unchanged : Int
+} derive(Eq, @debug.Debug)
+pub fn SnapshotImpact::is_empty(Self) -> Bool
+pub fn SnapshotImpact::summary(Self) -> String
 
 pub(all) struct ValidationDecision {
   route : RouteAnnouncement

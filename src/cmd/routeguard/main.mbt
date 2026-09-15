@@ -13,6 +13,7 @@ fn main {
     parsed.records,
   )
   println("VRP snapshot: \{snapshot_diff.summary()}")
+  let previous_vrps = previous.records.map(record => record.vrp)
   let vrps = parsed.records.map(record => record.vrp)
   let index = @moonrouteguard.VrpIndex::new(vrps)
   let routes = [
@@ -29,6 +30,10 @@ fn main {
       64497U,
     ),
   ]
+  let impact = @moonrouteguard.assess_snapshot_impact(
+    routes, previous_vrps, vrps,
+  )
+  println("Route impact: \{impact.summary()}")
   for decision in index.validate_all(routes) {
     println(decision.summary())
   }

@@ -22,6 +22,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
   changes, duplicate suppression, and hash-indexed membership checks;
 - order-preserving batch route validation;
 - indexed validation with at most 33 prefix-key lookups per IPv4 route;
+- route-impact analysis across VRP snapshots with old and new evidence;
 - portable library code without filesystem or network dependencies.
 
 ## Example
@@ -91,6 +92,23 @@ let decision = index.validate(route)
 
 Indexed validation returns the same ordered evidence as the linear API while
 avoiding a complete VRP scan for every route.
+
+Snapshot changes can be evaluated against routes before deployment:
+
+```moonbit
+let impact = @moonrouteguard.assess_snapshot_impact(
+  routes,
+  old_payloads,
+  current_payloads,
+)
+for change in impact.changed {
+  println(change.summary())
+}
+```
+
+The impact report includes only validity transitions and retains both complete
+decisions as evidence. Routes whose evidence changes without changing their
+validation state are counted as unchanged.
 
 ## Next steps
 
