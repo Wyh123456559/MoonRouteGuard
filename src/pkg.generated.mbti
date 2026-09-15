@@ -6,11 +6,20 @@ import {
 }
 
 // Values
+pub fn parse_vrp_csv(StringView) -> VrpCsvResult
+
 pub fn validate_route(RouteAnnouncement, Array[Vrp]) -> ValidationDecision
+
+pub fn validate_routes(Array[RouteAnnouncement], Array[Vrp]) -> Array[ValidationDecision]
 
 // Errors
 
 // Types and methods
+pub(all) struct CsvDiagnostic {
+  line : Int
+  message : String
+} derive(Eq, @debug.Debug)
+
 pub struct Ipv4Prefix {
   address : UInt
   length : Int
@@ -51,9 +60,20 @@ pub fn Vrp::max_length(Self) -> Int
 pub fn Vrp::new(Ipv4Prefix, Int, UInt) -> Result[Self, String]
 pub fn Vrp::prefix(Self) -> Ipv4Prefix
 
+pub(all) struct VrpCsvResult {
+  records : Array[VrpRecord]
+  diagnostics : Array[CsvDiagnostic]
+} derive(Eq, @debug.Debug)
+pub fn VrpCsvResult::is_valid(Self) -> Bool
+
 pub(all) struct VrpMatch {
   vrp : Vrp
   relation : VrpRelation
+} derive(Eq, @debug.Debug)
+
+pub(all) struct VrpRecord {
+  vrp : Vrp
+  trust_anchor : String
 } derive(Eq, @debug.Debug)
 
 pub(all) enum VrpRelation {

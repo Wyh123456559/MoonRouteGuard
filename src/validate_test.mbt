@@ -83,3 +83,16 @@ test "handle IPv4 boundary prefix lengths" {
   let decision = validate_route(route, [vrp("0.0.0.0/0", 32, 64496U)])
   assert_eq(decision.validity, Valid)
 }
+
+///|
+test "batch validation preserves route order" {
+  let payloads = [vrp("203.0.113.0/24", 24, 64496U)]
+  let routes = [
+    RouteAnnouncement::new(prefix("192.0.2.0/24"), 64496U),
+    RouteAnnouncement::new(prefix("203.0.113.0/24"), 64496U),
+  ]
+  let decisions = validate_routes(routes, payloads)
+  assert_eq(decisions.length(), 2)
+  assert_eq(decisions[0].validity, NotFound)
+  assert_eq(decisions[1].validity, Valid)
+}

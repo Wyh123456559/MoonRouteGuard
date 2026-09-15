@@ -39,3 +39,16 @@ pub fn validate_route(
   }
   { route, validity, matches, }
 }
+
+///|
+/// Validate routes in input order against the same VRP set.
+pub fn validate_routes(
+  routes : Array[RouteAnnouncement],
+  vrps : Array[Vrp],
+) -> Array[ValidationDecision] {
+  let decisions : Array[ValidationDecision] = []
+  for route in routes {
+    decisions.push(validate_route(route, vrps))
+  }
+  decisions
+}

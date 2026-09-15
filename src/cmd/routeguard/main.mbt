@@ -1,12 +1,10 @@
 ///|
 fn main {
-  let vrps = [
-    @moonrouteguard.Vrp::new(
-      @moonrouteguard.Ipv4Prefix::parse("203.0.113.0/24").unwrap(),
-      24,
-      64496U,
-    ).unwrap(),
-  ]
+  let csv =
+    #|ASN,IP Prefix,Max Length,Trust Anchor
+    #|AS64496,203.0.113.0/24,24,arin
+  let parsed = @moonrouteguard.parse_vrp_csv(csv)
+  let vrps = parsed.records.map(record => record.vrp)
   let routes = [
     @moonrouteguard.RouteAnnouncement::new(
       @moonrouteguard.Ipv4Prefix::parse("203.0.113.0/24").unwrap(),
@@ -21,7 +19,7 @@ fn main {
       64497U,
     ),
   ]
-  for route in routes {
-    println(@moonrouteguard.validate_route(route, vrps).summary())
+  for decision in @moonrouteguard.validate_routes(routes, vrps) {
+    println(decision.summary())
   }
 }
