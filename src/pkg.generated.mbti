@@ -12,6 +12,8 @@ pub fn assess_snapshot_impact(Array[RouteAnnouncement], Array[Vrp], Array[Vrp]) 
 
 pub fn compare_snapshots(Array[VrpRecord], Array[VrpRecord]) -> SnapshotDiff
 
+pub fn parse_slurm_json(StringView) -> Result[SlurmPolicy, String]
+
 pub fn parse_vrp_csv(StringView) -> VrpCsvResult
 
 pub fn slurm_assertion(Ipv4Prefix, UInt, max_length? : Int) -> Result[Vrp, String]
@@ -63,6 +65,12 @@ pub(all) struct SlurmApplyResult {
   duplicate_assertions : Int
 } derive(Eq, @debug.Debug)
 pub fn SlurmApplyResult::summary(Self) -> String
+
+pub(all) struct SlurmPolicy {
+  filters : Array[SlurmPrefixFilter]
+  assertions : Array[Vrp]
+} derive(Eq, @debug.Debug)
+pub fn SlurmPolicy::apply(Self, Array[Vrp]) -> SlurmApplyResult
 
 pub struct SlurmPrefixFilter {
   prefix : Ipv4Prefix?

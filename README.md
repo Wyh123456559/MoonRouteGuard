@@ -24,6 +24,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - indexed validation with at most 33 prefix-key lookups per IPv4 route;
 - route-impact analysis across VRP snapshots with old and new evidence;
 - RFC 8416 IPv4 prefix filters and locally added assertions;
+- strict RFC 8416 JSON parsing with atomic configuration rejection;
 - portable library code without filesystem or network dependencies.
 
 ## Example
@@ -120,17 +121,23 @@ let local = @moonrouteguard.apply_slurm(payloads, [filter], [assertion])
 let index = @moonrouteguard.VrpIndex::new(local.vrps)
 ```
 
+The same policy can be loaded from a complete SLURM document:
+
+```moonbit
+let policy = @moonrouteguard.parse_slurm_json(source).unwrap()
+let local = policy.apply(payloads)
+```
+
 The implementation follows [RFC 8416](https://www.rfc-editor.org/rfc/rfc8416.html)
 ordering: filters apply to validated RPKI output first, then local assertions
-are appended without exact duplicates. Prefix-only, ASN-only, and combined
-prefix-and-ASN filters are supported. JSON SLURM file parsing and BGPsec rules
-are not implemented yet.
+are appended without exact duplicates. The parser rejects unknown members and
+unsupported configurations as a whole. Prefix-only, ASN-only, and combined
+prefix-and-ASN filters are supported; IPv6 and BGPsec rules are not yet.
 
 ## Next steps
 
-Planned work includes IPv6 prefixes, JSON SLURM file parsing, BGPsec SLURM
-rules, and RPKI-to-Router PDU support. These capabilities are not part of the
-current release.
+Planned work includes IPv6 prefixes, BGPsec SLURM rules, and RPKI-to-Router PDU
+support. These capabilities are not part of the current release.
 
 ## License
 
