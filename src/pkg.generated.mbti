@@ -22,6 +22,8 @@ pub fn validate_route(RouteAnnouncement, Array[Vrp]) -> ValidationDecision
 
 pub fn validate_routes(Array[RouteAnnouncement], Array[Vrp]) -> Array[ValidationDecision]
 
+pub fn write_slurm_json(SlurmPolicy) -> String
+
 pub fn write_vrp_csv(Array[VrpRecord], VrpCsvStyle) -> Result[String, String]
 
 // Errors

@@ -26,6 +26,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - route-impact analysis across VRP snapshots with old and new evidence;
 - RFC 8416 IPv4 prefix filters and locally added assertions;
 - strict RFC 8416 JSON parsing with atomic configuration rejection;
+- deterministic RFC 8416 JSON output with parse/write round-trip safety;
 - portable library code without filesystem or network dependencies.
 
 ## Example
@@ -140,6 +141,17 @@ The same policy can be loaded from a complete SLURM document:
 let policy = @moonrouteguard.parse_slurm_json(source).unwrap()
 let local = policy.apply(payloads)
 ```
+
+Validated policies can be normalized for review or checked into configuration
+repositories:
+
+```moonbit
+let normalized = @moonrouteguard.write_slurm_json(policy)
+```
+
+The writer preserves filter and assertion order, escapes comments through the
+standard JSON encoder, emits empty BGPsec sections, and omits a redundant
+`maxPrefixLength` when it equals the asserted prefix length.
 
 The implementation follows [RFC 8416](https://www.rfc-editor.org/rfc/rfc8416.html)
 ordering: filters apply to validated RPKI output first, then local assertions
