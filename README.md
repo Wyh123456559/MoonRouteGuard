@@ -27,6 +27,8 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - RFC 8416 IPv4 prefix filters and locally added assertions;
 - strict RFC 8416 JSON parsing with atomic configuration rejection;
 - deterministic RFC 8416 JSON output with parse/write round-trip safety;
+- [RFC 8210](https://www.rfc-editor.org/rfc/rfc8210.html) version 1 control and
+  IPv4 prefix PDU encoding and decoding;
 - portable library code without filesystem or network dependencies.
 
 ## Example
@@ -159,10 +161,26 @@ are appended without exact duplicates. The parser rejects unknown members and
 unsupported configurations as a whole. Prefix-only, ASN-only, and combined
 prefix-and-ASN filters are supported; IPv6 and BGPsec rules are not yet.
 
+RPKI-RTR version 1 data can be exchanged as binary PDUs without coupling the
+library to a particular socket implementation:
+
+```moonbit
+let query = @moonrouteguard.encode_rtr_pdu(
+  @moonrouteguard.SerialQuery(42, 7U),
+).unwrap()
+let response = @moonrouteguard.decode_rtr_pdus(received_bytes).unwrap()
+```
+
+The codec currently supports Serial Notify, Serial Query, Reset Query, Cache
+Response, IPv4 Prefix, End of Data, and Cache Reset PDUs. It validates framing,
+IPv4 payloads, session identifiers, and RFC 8210 timing bounds while preserving
+the protocol's requirement to ignore reserved fields on receipt.
+
 ## Next steps
 
-Planned work includes IPv6 prefixes, BGPsec SLURM rules, and RPKI-to-Router PDU
-support. These capabilities are not part of the current release.
+Planned work includes IPv6 prefixes, BGPsec SLURM rules, Router Key and Error
+Report PDUs, and an RPKI-RTR session state machine. These capabilities are not
+part of the current release.
 
 ## License
 

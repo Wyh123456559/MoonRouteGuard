@@ -12,6 +12,12 @@ pub fn assess_snapshot_impact(Array[RouteAnnouncement], Array[Vrp], Array[Vrp]) 
 
 pub fn compare_snapshots(Array[VrpRecord], Array[VrpRecord]) -> SnapshotDiff
 
+pub fn decode_rtr_pdu(Bytes) -> Result[RtrPdu, String]
+
+pub fn decode_rtr_pdus(Bytes) -> Result[Array[RtrPdu], String]
+
+pub fn encode_rtr_pdu(RtrPdu) -> Result[Bytes, String]
+
 pub fn parse_slurm_json(StringView) -> Result[SlurmPolicy, String]
 
 pub fn parse_vrp_csv(StringView) -> VrpCsvResult
@@ -33,48 +39,82 @@ pub(all) struct CsvDiagnostic {
   line : Int
   message : String
 } derive(Eq, @debug.Debug)
+pub fn CsvDiagnostic::equal(Self, Self) -> Bool
+pub fn CsvDiagnostic::not_equal(Self, Self) -> Bool
+pub fn CsvDiagnostic::to_repr(Self) -> @debug.Repr
 
 pub struct Ipv4Prefix {
   address : UInt
   length : Int
 } derive(Eq, @debug.Debug)
 pub fn Ipv4Prefix::covers(Self, Self) -> Bool
+pub fn Ipv4Prefix::equal(Self, Self) -> Bool
 pub fn Ipv4Prefix::length(Self) -> Int
+pub fn Ipv4Prefix::not_equal(Self, Self) -> Bool
 pub fn Ipv4Prefix::parse(StringView) -> Result[Self, String]
+pub fn Ipv4Prefix::to_repr(Self) -> @debug.Repr
 pub fn Ipv4Prefix::to_string(Self) -> String
 
 pub struct RouteAnnouncement {
   prefix : Ipv4Prefix
   origin_asn : UInt
 } derive(Eq, @debug.Debug)
+pub fn RouteAnnouncement::equal(Self, Self) -> Bool
 pub fn RouteAnnouncement::new(Ipv4Prefix, UInt) -> Self
+pub fn RouteAnnouncement::not_equal(Self, Self) -> Bool
 pub fn RouteAnnouncement::origin_asn(Self) -> UInt
 pub fn RouteAnnouncement::prefix(Self) -> Ipv4Prefix
+pub fn RouteAnnouncement::to_repr(Self) -> @debug.Repr
 
 pub(all) struct RouteImpact {
   previous : ValidationDecision
   current : ValidationDecision
 } derive(Eq, @debug.Debug)
+pub fn RouteImpact::equal(Self, Self) -> Bool
+pub fn RouteImpact::not_equal(Self, Self) -> Bool
 pub fn RouteImpact::summary(Self) -> String
+pub fn RouteImpact::to_repr(Self) -> @debug.Repr
 
 pub(all) enum RouteValidity {
   Valid
   Invalid
   NotFound
 } derive(Eq, @debug.Debug)
+pub fn RouteValidity::equal(Self, Self) -> Bool
+pub fn RouteValidity::not_equal(Self, Self) -> Bool
+pub fn RouteValidity::to_repr(Self) -> @debug.Repr
+
+pub(all) enum RtrPdu {
+  SerialNotify(Int, UInt)
+  SerialQuery(Int, UInt)
+  ResetQuery
+  CacheResponse(Int)
+  Ipv4PrefixPdu(Bool, Vrp)
+  EndOfData(Int, UInt, UInt, UInt, UInt)
+  CacheReset
+} derive(Eq, @debug.Debug)
+pub fn RtrPdu::equal(Self, Self) -> Bool
+pub fn RtrPdu::not_equal(Self, Self) -> Bool
+pub fn RtrPdu::to_repr(Self) -> @debug.Repr
 
 pub(all) struct SlurmApplyResult {
   vrps : Array[Vrp]
   filtered : Int
   duplicate_assertions : Int
 } derive(Eq, @debug.Debug)
+pub fn SlurmApplyResult::equal(Self, Self) -> Bool
+pub fn SlurmApplyResult::not_equal(Self, Self) -> Bool
 pub fn SlurmApplyResult::summary(Self) -> String
+pub fn SlurmApplyResult::to_repr(Self) -> @debug.Repr
 
 pub(all) struct SlurmPolicy {
   filters : Array[SlurmPrefixFilter]
   assertions : Array[Vrp]
 } derive(Eq, @debug.Debug)
 pub fn SlurmPolicy::apply(Self, Array[Vrp]) -> SlurmApplyResult
+pub fn SlurmPolicy::equal(Self, Self) -> Bool
+pub fn SlurmPolicy::not_equal(Self, Self) -> Bool
+pub fn SlurmPolicy::to_repr(Self) -> @debug.Repr
 
 pub struct SlurmPrefixFilter {
   prefix : Ipv4Prefix?
@@ -86,31 +126,47 @@ pub fn SlurmPrefixFilter::by_asn(UInt, comment? : String) -> Self
 pub fn SlurmPrefixFilter::by_prefix(Ipv4Prefix, comment? : String) -> Self
 pub fn SlurmPrefixFilter::by_prefix_and_asn(Ipv4Prefix, UInt, comment? : String) -> Self
 pub fn SlurmPrefixFilter::comment(Self) -> String
+pub fn SlurmPrefixFilter::equal(Self, Self) -> Bool
+pub fn SlurmPrefixFilter::not_equal(Self, Self) -> Bool
 pub fn SlurmPrefixFilter::prefix(Self) -> Ipv4Prefix?
+pub fn SlurmPrefixFilter::to_repr(Self) -> @debug.Repr
 
 type SlurmVrpKey derive(Eq, Hash)
+pub fn SlurmVrpKey::equal(Self, Self) -> Bool
+pub fn SlurmVrpKey::hash(Self) -> Int
+pub fn SlurmVrpKey::hash_combine(Self, Hasher) -> Unit
+pub fn SlurmVrpKey::not_equal(Self, Self) -> Bool
 
 pub(all) struct SnapshotDiff {
   added : Array[VrpRecord]
   removed : Array[VrpRecord]
   unchanged : Int
 } derive(Eq, @debug.Debug)
+pub fn SnapshotDiff::equal(Self, Self) -> Bool
 pub fn SnapshotDiff::is_empty(Self) -> Bool
+pub fn SnapshotDiff::not_equal(Self, Self) -> Bool
 pub fn SnapshotDiff::summary(Self) -> String
+pub fn SnapshotDiff::to_repr(Self) -> @debug.Repr
 
 pub(all) struct SnapshotImpact {
   changed : Array[RouteImpact]
   unchanged : Int
 } derive(Eq, @debug.Debug)
+pub fn SnapshotImpact::equal(Self, Self) -> Bool
 pub fn SnapshotImpact::is_empty(Self) -> Bool
+pub fn SnapshotImpact::not_equal(Self, Self) -> Bool
 pub fn SnapshotImpact::summary(Self) -> String
+pub fn SnapshotImpact::to_repr(Self) -> @debug.Repr
 
 pub(all) struct ValidationDecision {
   route : RouteAnnouncement
   validity : RouteValidity
   matches : Array[VrpMatch]
 } derive(Eq, @debug.Debug)
+pub fn ValidationDecision::equal(Self, Self) -> Bool
+pub fn ValidationDecision::not_equal(Self, Self) -> Bool
 pub fn ValidationDecision::summary(Self) -> String
+pub fn ValidationDecision::to_repr(Self) -> @debug.Repr
 
 pub struct Vrp {
   prefix : Ipv4Prefix
@@ -118,20 +174,29 @@ pub struct Vrp {
   asn : UInt
 } derive(Eq, @debug.Debug)
 pub fn Vrp::asn(Self) -> UInt
+pub fn Vrp::equal(Self, Self) -> Bool
 pub fn Vrp::max_length(Self) -> Int
 pub fn Vrp::new(Ipv4Prefix, Int, UInt) -> Result[Self, String]
+pub fn Vrp::not_equal(Self, Self) -> Bool
 pub fn Vrp::prefix(Self) -> Ipv4Prefix
+pub fn Vrp::to_repr(Self) -> @debug.Repr
 
 pub(all) struct VrpCsvResult {
   records : Array[VrpRecord]
   diagnostics : Array[CsvDiagnostic]
 } derive(Eq, @debug.Debug)
+pub fn VrpCsvResult::equal(Self, Self) -> Bool
 pub fn VrpCsvResult::is_valid(Self) -> Bool
+pub fn VrpCsvResult::not_equal(Self, Self) -> Bool
+pub fn VrpCsvResult::to_repr(Self) -> @debug.Repr
 
 pub(all) enum VrpCsvStyle {
   RoutinatorCsv
   RoutinatorCsvCompat
 } derive(Eq, @debug.Debug)
+pub fn VrpCsvStyle::equal(Self, Self) -> Bool
+pub fn VrpCsvStyle::not_equal(Self, Self) -> Bool
+pub fn VrpCsvStyle::to_repr(Self) -> @debug.Repr
 
 pub struct VrpIndex {
   buckets : Array[Map[UInt, Array[Int]]]
@@ -146,13 +211,23 @@ pub(all) struct VrpMatch {
   vrp : Vrp
   relation : VrpRelation
 } derive(Eq, @debug.Debug)
+pub fn VrpMatch::equal(Self, Self) -> Bool
+pub fn VrpMatch::not_equal(Self, Self) -> Bool
+pub fn VrpMatch::to_repr(Self) -> @debug.Repr
 
 pub(all) struct VrpRecord {
   vrp : Vrp
   trust_anchor : String
 } derive(Eq, @debug.Debug)
+pub fn VrpRecord::equal(Self, Self) -> Bool
+pub fn VrpRecord::not_equal(Self, Self) -> Bool
+pub fn VrpRecord::to_repr(Self) -> @debug.Repr
 
 type VrpRecordKey derive(Eq, Hash)
+pub fn VrpRecordKey::equal(Self, Self) -> Bool
+pub fn VrpRecordKey::hash(Self) -> Int
+pub fn VrpRecordKey::hash_combine(Self, Hasher) -> Unit
+pub fn VrpRecordKey::not_equal(Self, Self) -> Bool
 
 pub(all) enum VrpRelation {
   Authorizes
@@ -160,6 +235,9 @@ pub(all) enum VrpRelation {
   LengthExceeded
   AsnAndLengthMismatch
 } derive(Eq, @debug.Debug)
+pub fn VrpRelation::equal(Self, Self) -> Bool
+pub fn VrpRelation::not_equal(Self, Self) -> Bool
+pub fn VrpRelation::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 
