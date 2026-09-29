@@ -58,6 +58,7 @@ test "assess CSV snapshots against actual route rows" {
   assert_eq(report.text.contains("1 unchanged"), true)
   assert_eq(report.json.contains("\"newlyInvalid\":1"), true)
   assert_eq(report.json.contains("\"relation\":\"asnMismatch\""), true)
+  assert_eq(report.json.contains("\"trustAnchor\":\"arin\""), true)
 }
 
 ///|

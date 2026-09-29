@@ -53,12 +53,26 @@ fn write_slurm_apply_json(
 }
 
 ///|
+fn write_vrp_record_json(buffer : StringBuilder, record : VrpRecord) -> Unit {
+  buffer.write_string("{\"asn\":")
+  buffer.write_string(record.vrp.asn().to_string())
+  buffer.write_string(",\"prefix\":")
+  buffer.write_string(report_json_string(record.vrp.prefix().to_string()))
+  buffer.write_string(",\"maxLength\":")
+  buffer.write_string(record.vrp.max_length().to_string())
+  buffer.write_string(",\"trustAnchor\":")
+  buffer.write_string(report_json_string(record.trust_anchor))
+  buffer.write_char('}')
+}
+
+///|
 /// Serialize a snapshot comparison and its route impact as deterministic JSON.
 ///
 /// Only routes whose validity state changes appear in the changes array; the
 /// total number of other checked routes appears in unchanged. Covering VRPs
-/// explain each old and new decision. Trust-anchor labels are not present in
-/// validation decisions and therefore are not included in this report.
+/// explain each old and new decision. Exact added and removed VRP records
+/// retain their trust-anchor labels. Per-decision covering VRPs do not carry
+/// labels because the validation decision model does not retain their source.
 pub fn write_assessment_json(
   diff : SnapshotDiff,
   impact : SnapshotImpact,
@@ -88,7 +102,21 @@ pub fn write_assessment_json(
   buffer.write_string(diff.removed.length().to_string())
   buffer.write_string(",\"unchanged\":")
   buffer.write_string(diff.unchanged.to_string())
-  buffer.write_string("},\"routeImpact\":{\"checked\":")
+  buffer.write_string(",\"addedRecords\":[")
+  for index, record in diff.added {
+    if index > 0 {
+      buffer.write_char(',')
+    }
+    write_vrp_record_json(buffer, record)
+  }
+  buffer.write_string("],\"removedRecords\":[")
+  for index, record in diff.removed {
+    if index > 0 {
+      buffer.write_char(',')
+    }
+    write_vrp_record_json(buffer, record)
+  }
+  buffer.write_string("]},\"routeImpact\":{\"checked\":")
   buffer.write_string((impact.changed.length() + impact.unchanged).to_string())
   buffer.write_string(",\"changed\":")
   buffer.write_string(impact.changed.length().to_string())
