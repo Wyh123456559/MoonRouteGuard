@@ -39,6 +39,20 @@ fn write_decision_json(
 }
 
 ///|
+fn write_slurm_apply_json(
+  buffer : StringBuilder,
+  applied : SlurmApplyResult,
+) -> Unit {
+  buffer.write_string("{\"effectiveVrps\":")
+  buffer.write_string(applied.vrps.length().to_string())
+  buffer.write_string(",\"filtered\":")
+  buffer.write_string(applied.filtered.to_string())
+  buffer.write_string(",\"duplicateAssertions\":")
+  buffer.write_string(applied.duplicate_assertions.to_string())
+  buffer.write_char('}')
+}
+
+///|
 /// Serialize a snapshot comparison and its route impact as deterministic JSON.
 ///
 /// Only routes whose validity state changes appear in the changes array; the
@@ -48,6 +62,7 @@ fn write_decision_json(
 pub fn write_assessment_json(
   diff : SnapshotDiff,
   impact : SnapshotImpact,
+  slurm? : (SlurmApplyResult, SlurmApplyResult),
 ) -> String {
   let buffer = StringBuilder()
   let mut newly_invalid = 0
@@ -56,7 +71,18 @@ pub fn write_assessment_json(
       newly_invalid = newly_invalid + 1
     }
   }
-  buffer.write_string("{\"schemaVersion\":1,\"snapshot\":{\"added\":")
+  buffer.write_string("{\"schemaVersion\":1")
+  match slurm {
+    Some((before, after)) => {
+      buffer.write_string(",\"slurm\":{\"before\":")
+      write_slurm_apply_json(buffer, before)
+      buffer.write_string(",\"after\":")
+      write_slurm_apply_json(buffer, after)
+      buffer.write_char('}')
+    }
+    None => ()
+  }
+  buffer.write_string(",\"snapshot\":{\"added\":")
   buffer.write_string(diff.added.length().to_string())
   buffer.write_string(",\"removed\":")
   buffer.write_string(diff.removed.length().to_string())

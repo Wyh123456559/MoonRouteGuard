@@ -29,6 +29,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - route-impact analysis across VRP snapshots with old and new evidence;
 - Node.js command-line assessment of three CSV files, with an optional failure
   exit code for newly invalid routes;
+- optional RFC 8416 SLURM policy simulation in the command-line assessment;
 - deterministic JSON assessment reports with old and new covering VRP evidence;
 - RFC 8416 IPv4 prefix filters and locally added assertions;
 - strict RFC 8416 JSON parsing with atomic configuration rejection;
@@ -77,6 +78,11 @@ moon test --target js --deny-warn
 ```
 
 The command prints the VRP snapshot difference and route validity transitions.
+To model the same local exception policy on both snapshots, add
+`--slurm examples/slurm.json` before the three CSV paths. The snapshot diff
+still describes the raw validator output; route impact uses the effective VRPs
+after SLURM. Text and JSON output include the policy's filter and assertion
+counts. The example policy prevents the sample route from becoming Invalid.
 Add `--json` before the paths for a machine-readable report with snapshot
 counts, route transitions, and the covering VRPs behind each decision. The
 portable library also exposes `write_assessment_json(diff, impact)`.

@@ -43,11 +43,12 @@ struct CliConfig {
   routes_path : String
   fail_on_new_invalid : Bool
   json : Bool
+  slurm_path : String?
 }
 
 ///|
 fn usage() -> String {
-  "usage: routeguard [--json] [--fail-on-new-invalid] BEFORE.csv AFTER.csv ROUTES.csv"
+  "usage: routeguard [--json] [--fail-on-new-invalid] [--slurm POLICY.json] BEFORE.csv AFTER.csv ROUTES.csv"
 }
 
 ///|
@@ -55,11 +56,20 @@ fn parse_cli(argv : Array[String]) -> Result[CliConfig, String] {
   let mut start = 0
   let mut fail_on_new_invalid = false
   let mut json = false
+  let mut slurm_path : String? = None
   while start < argv.length() && argv[start].has_prefix("--") {
     if argv[start] == "--fail-on-new-invalid" && !fail_on_new_invalid {
       fail_on_new_invalid = true
     } else if argv[start] == "--json" && !json {
       json = true
+    } else if argv[start] == "--slurm" && slurm_path is None {
+      if start + 1 >= argv.length() ||
+        argv[start + 1].is_empty() ||
+        argv[start + 1].has_prefix("--") {
+        return Err(usage())
+      }
+      slurm_path = Some(argv[start + 1])
+      start = start + 1
     } else {
       return Err(usage())
     }
@@ -79,6 +89,7 @@ fn parse_cli(argv : Array[String]) -> Result[CliConfig, String] {
     routes_path: argv[start + 2],
     fail_on_new_invalid,
     json,
+    slurm_path,
   })
 }
 
@@ -109,6 +120,8 @@ fn assess_csv_inputs(
   after_source : String,
   routes_path : String,
   routes_source : String,
+  slurm_path : String?,
+  slurm_source : String?,
 ) -> Result[CliReport, String] {
   let before = @lib.parse_vrp_csv(before_source)
   let after = @lib.parse_vrp_csv(after_source)
@@ -122,8 +135,26 @@ fn assess_csv_inputs(
     return Err(error_text)
   }
   let diff = @lib.compare_snapshots(before.records, after.records)
-  let previous_vrps = before.records.map(record => record.vrp)
-  let current_vrps = after.records.map(record => record.vrp)
+  let mut previous_vrps = before.records.map(record => record.vrp)
+  let mut current_vrps = after.records.map(record => record.vrp)
+  let mut previous_policy : @lib.SlurmApplyResult? = None
+  let mut current_policy : @lib.SlurmApplyResult? = None
+  match slurm_source {
+    Some(source) => {
+      let policy = match @lib.parse_slurm_json(source) {
+        Ok(value) => value
+        Err(message) =>
+          return Err("\{slurm_path.unwrap_or("SLURM")}: \{message}\n")
+      }
+      let before_applied = policy.apply(previous_vrps)
+      let after_applied = policy.apply(current_vrps)
+      previous_vrps = before_applied.vrps
+      current_vrps = after_applied.vrps
+      previous_policy = Some(before_applied)
+      current_policy = Some(after_applied)
+    }
+    None => ()
+  }
   let impact = @lib.assess_snapshot_impact(
     routes.routes,
     previous_vrps,
@@ -131,6 +162,17 @@ fn assess_csv_inputs(
   )
   let report = StringBuilder()
   report.write_string("VRP snapshot: \{diff.summary()}\n")
+  match previous_policy {
+    Some(before_applied) => {
+      report.write_string("SLURM before: \{before_applied.summary()}\n")
+      match current_policy {
+        Some(after_applied) =>
+          report.write_string("SLURM after: \{after_applied.summary()}\n")
+        None => ()
+      }
+    }
+    None => ()
+  }
   report.write_string("Route impact: \{impact.summary()}\n")
   let mut newly_invalid = 0
   for change in impact.changed {
@@ -142,11 +184,20 @@ fn assess_csv_inputs(
     report.write_string("\n")
   }
   report.write_string("Newly invalid routes: \{newly_invalid}\n")
-  Ok({
-    text: report.to_string(),
-    json: @lib.write_assessment_json(diff, impact),
-    newly_invalid,
-  })
+  let json = match previous_policy {
+    Some(before_applied) =>
+      match current_policy {
+        Some(after_applied) =>
+          @lib.write_assessment_json(
+            diff,
+            impact,
+            slurm=(before_applied, after_applied),
+          )
+        None => @lib.write_assessment_json(diff, impact)
+      }
+    None => @lib.write_assessment_json(diff, impact)
+  }
+  Ok({ text: report.to_string(), json, newly_invalid, })
 }
 
 ///|
@@ -198,6 +249,18 @@ fn main {
       return
     }
   }
+  let slurm_source = match config.slurm_path {
+    Some(path) =>
+      match read_text(path) {
+        Ok(source) => Some(source)
+        Err(message) => {
+          node_write_error("\{message}\n")
+          node_set_exit_code(2)
+          return
+        }
+      }
+    None => None
+  }
   match
     assess_csv_inputs(
       config.before_path,
@@ -206,6 +269,8 @@ fn main {
       after,
       config.routes_path,
       routes,
+      config.slurm_path,
+      slurm_source,
     ) {
     Ok(report) => {
       if config.json {

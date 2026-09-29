@@ -34,7 +34,7 @@ pub fn validate_route(RouteAnnouncement, Array[Vrp]) -> ValidationDecision
 
 pub fn validate_routes(Array[RouteAnnouncement], Array[Vrp]) -> Array[ValidationDecision]
 
-pub fn write_assessment_json(SnapshotDiff, SnapshotImpact) -> String
+pub fn write_assessment_json(SnapshotDiff, SnapshotImpact, slurm? : (SlurmApplyResult, SlurmApplyResult)) -> String
 
 pub fn write_slurm_json(SlurmPolicy) -> String
 
