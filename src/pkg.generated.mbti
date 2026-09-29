@@ -18,6 +18,8 @@ pub fn decode_rtr_pdus(Bytes) -> Result[Array[RtrPdu], String]
 
 pub fn encode_rtr_pdu(RtrPdu) -> Result[Bytes, String]
 
+pub fn parse_route_csv(StringView) -> RouteCsvResult
+
 pub fn parse_slurm_json(StringView) -> Result[SlurmPolicy, String]
 
 pub fn parse_vrp_csv(StringView) -> VrpCsvResult
@@ -137,6 +139,12 @@ pub fn RouteAnnouncement::not_equal(Self, Self) -> Bool
 pub fn RouteAnnouncement::origin_asn(Self) -> UInt
 pub fn RouteAnnouncement::prefix(Self) -> Ipv4Prefix
 pub fn RouteAnnouncement::to_repr(Self) -> @debug.Repr
+
+pub(all) struct RouteCsvResult {
+  routes : Array[RouteAnnouncement]
+  diagnostics : Array[CsvDiagnostic]
+}
+pub fn RouteCsvResult::is_valid(Self) -> Bool
 
 pub(all) struct RouteImpact {
   previous : ValidationDecision

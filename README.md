@@ -18,6 +18,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - correct handling of overlapping VRPs where any authorizing payload makes the
   route valid;
 - Routinator `csv` and quoted `csvcompat` VRP input with trust-anchor labels;
+- two-column IPv4 route CSV input with line-numbered diagnostics;
 - deterministic Routinator `csv` and `csvcompat` output with round-trip safety;
 - recoverable, line-numbered diagnostics for malformed or unsupported rows;
 - set-based comparison of complete VRP snapshots, including trust-anchor
@@ -98,6 +99,17 @@ The accepted four-column layout follows Routinator's documented
 [`csv` and `csvcompat` formats](https://routinator.docs.nlnetlabs.nl/en/stable/output-formats.html).
 The current parser reports IPv6 rows as unsupported instead of silently
 discarding them.
+
+Route announcements for batch validation can be loaded from a separate CSV:
+
+```text
+ASN,IP Prefix
+AS64496,203.0.113.0/24
+AS64500,198.51.100.0/24
+```
+
+`parse_route_csv` accepts prefixed or bare ASNs and reports malformed rows with
+line numbers. It currently supports IPv4 routes only.
 
 Parsed records can be written back in either Routinator layout:
 
