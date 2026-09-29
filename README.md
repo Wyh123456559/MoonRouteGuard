@@ -27,6 +27,8 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - indexed validation with at most 33 prefix-key lookups per IPv4 route;
 - IPv6 VRP validation and an index with at most 129 prefix-key lookups per route;
 - route-impact analysis across VRP snapshots with old and new evidence;
+- Node.js command-line assessment of three CSV files, with an optional failure
+  exit code for newly invalid routes;
 - RFC 8416 IPv4 prefix filters and locally added assertions;
 - strict RFC 8416 JSON parsing with atomic configuration rejection;
 - deterministic RFC 8416 JSON output with parse/write round-trip safety;
@@ -64,16 +66,23 @@ if parsed.is_valid() {
 }
 ```
 
-Run the bundled example and checks:
+Run the Node.js command-line example and checks:
 
 ```text
-moon run src/cmd/routeguard
+moon run --target js src/cmd/routeguard -- examples/before.csv examples/after.csv examples/routes.csv
 moon check --target wasm --deny-warn
 moon test --target wasm --deny-warn
+moon test --target js --deny-warn
 ```
 
-The example prints one valid route, one route rejected for exceeding
-`maxLength`, and one route with no covering VRP.
+The command prints the VRP snapshot difference and route validity transitions.
+Pass `--fail-on-new-invalid` before the three paths to make a newly Invalid
+route fail the check. The generated Node.js process uses exit code 3 for that
+case and 2 for file or parse errors; `moon run` may normalize nonzero codes to
+1. For CI that needs the exact code, build with `moon build --target js` and run
+`node _build/js/debug/build/cmd/routeguard/routeguard.js` with the same arguments.
+The CLI currently supports IPv4 CSV input and requires Node.js; the library
+remains portable across Wasm, Wasm-GC, and JavaScript.
 
 IPv6 route origin validation uses the same validity states and evidence
 relations. Its prefix parser accepts compressed hexadecimal addresses and

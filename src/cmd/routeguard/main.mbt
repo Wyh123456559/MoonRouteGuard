@@ -1,40 +1,207 @@
 ///|
+extern "js" fn node_read_file(path : String) -> String =
+  #| function(path) {
+  #|   try {
+  #|     globalThis.__routeguardReadError = "";
+  #|     return require("node:fs").readFileSync(path, "utf8");
+  #|   } catch (error) {
+  #|     globalThis.__routeguardReadError = error instanceof Error
+  #|       ? error.message
+  #|       : String(error);
+  #|     return "";
+  #|   }
+  #| }
+
+///|
+extern "js" fn node_last_read_error() -> String =
+  #| function() {
+  #|   return globalThis.__routeguardReadError || "";
+  #| }
+
+///|
+extern "js" fn node_write_error(message : String) -> Unit =
+  #| function(message) {
+  #|   process.stderr.write(message);
+  #| }
+
+///|
+extern "js" fn node_write_output(message : String) -> Unit =
+  #| function(message) {
+  #|   process.stdout.write(message);
+  #| }
+
+///|
+extern "js" fn node_set_exit_code(code : Int) -> Unit =
+  #| function(code) {
+  #|   process.exitCode = code;
+  #| }
+
+///|
+struct CliConfig {
+  before_path : String
+  after_path : String
+  routes_path : String
+  fail_on_new_invalid : Bool
+}
+
+///|
+fn usage() -> String {
+  "usage: routeguard [--fail-on-new-invalid] BEFORE.csv AFTER.csv ROUTES.csv"
+}
+
+///|
+fn parse_cli(argv : Array[String]) -> Result[CliConfig, String] {
+  let mut start = 0
+  let mut fail_on_new_invalid = false
+  if argv.length() > 0 && argv[0] == "--fail-on-new-invalid" {
+    start = 1
+    fail_on_new_invalid = true
+  }
+  if argv.length() != start + 3 {
+    return Err(usage())
+  }
+  for path in argv[start:] {
+    if path.is_empty() || path.has_prefix("--") {
+      return Err(usage())
+    }
+  }
+  Ok({
+    before_path: argv[start],
+    after_path: argv[start + 1],
+    routes_path: argv[start + 2],
+    fail_on_new_invalid,
+  })
+}
+
+///|
+fn format_diagnostics(
+  path : String,
+  diagnostics : Array[@lib.CsvDiagnostic],
+) -> String {
+  let buffer = StringBuilder()
+  for diagnostic in diagnostics {
+    buffer.write_string("\{path}:\{diagnostic.line}: \{diagnostic.message}\n")
+  }
+  buffer.to_string()
+}
+
+///|
+struct CliReport {
+  text : String
+  newly_invalid : Int
+}
+
+///|
+fn assess_csv_inputs(
+  before_path : String,
+  before_source : String,
+  after_path : String,
+  after_source : String,
+  routes_path : String,
+  routes_source : String,
+) -> Result[CliReport, String] {
+  let before = @lib.parse_vrp_csv(before_source)
+  let after = @lib.parse_vrp_csv(after_source)
+  let routes = @lib.parse_route_csv(routes_source)
+  let errors = StringBuilder()
+  errors.write_string(format_diagnostics(before_path, before.diagnostics))
+  errors.write_string(format_diagnostics(after_path, after.diagnostics))
+  errors.write_string(format_diagnostics(routes_path, routes.diagnostics))
+  let error_text = errors.to_string()
+  if !error_text.is_empty() {
+    return Err(error_text)
+  }
+  let diff = @lib.compare_snapshots(before.records, after.records)
+  let previous_vrps = before.records.map(record => record.vrp)
+  let current_vrps = after.records.map(record => record.vrp)
+  let impact = @lib.assess_snapshot_impact(
+    routes.routes,
+    previous_vrps,
+    current_vrps,
+  )
+  let report = StringBuilder()
+  report.write_string("VRP snapshot: \{diff.summary()}\n")
+  report.write_string("Route impact: \{impact.summary()}\n")
+  let mut newly_invalid = 0
+  for change in impact.changed {
+    if change.current.validity == @lib.Invalid {
+      newly_invalid = newly_invalid + 1
+      report.write_string("NEW INVALID: ")
+    }
+    report.write_string(change.summary())
+    report.write_string("\n")
+  }
+  report.write_string("Newly invalid routes: \{newly_invalid}\n")
+  Ok({ text: report.to_string(), newly_invalid, })
+}
+
+///|
+fn read_text(path : String) -> Result[String, String] {
+  let source = node_read_file(path)
+  let read_error = node_last_read_error()
+  if !read_error.is_empty() {
+    return Err("routeguard: unable to read \{path}: \{read_error}")
+  }
+  Ok(source)
+}
+
+///|
 fn main {
-  let previous_csv =
-    #|ASN,IP Prefix,Max Length,Trust Anchor
-    #|AS64496,203.0.113.0/24,24,arin
-  let current_csv =
-    #|ASN,IP Prefix,Max Length,Trust Anchor
-    #|AS64496,203.0.113.0/24,26,arin
-  let previous = @moonrouteguard.parse_vrp_csv(previous_csv)
-  let parsed = @moonrouteguard.parse_vrp_csv(current_csv)
-  let snapshot_diff = @moonrouteguard.compare_snapshots(
-    previous.records,
-    parsed.records,
-  )
-  println("VRP snapshot: \{snapshot_diff.summary()}")
-  let previous_vrps = previous.records.map(record => record.vrp)
-  let vrps = parsed.records.map(record => record.vrp)
-  let index = @moonrouteguard.VrpIndex::new(vrps)
-  let routes = [
-    @moonrouteguard.RouteAnnouncement::new(
-      @moonrouteguard.Ipv4Prefix::parse("203.0.113.0/24").unwrap(),
-      64496U,
-    ),
-    @moonrouteguard.RouteAnnouncement::new(
-      @moonrouteguard.Ipv4Prefix::parse("203.0.113.0/25").unwrap(),
-      64496U,
-    ),
-    @moonrouteguard.RouteAnnouncement::new(
-      @moonrouteguard.Ipv4Prefix::parse("192.0.2.0/24").unwrap(),
-      64497U,
-    ),
-  ]
-  let impact = @moonrouteguard.assess_snapshot_impact(
-    routes, previous_vrps, vrps,
-  )
-  println("Route impact: \{impact.summary()}")
-  for decision in index.validate_all(routes) {
-    println(decision.summary())
+  let argv = @env.args()
+  let inputs : Array[String] = []
+  for index = 2; index < argv.length(); index = index + 1 {
+    inputs.push(argv[index])
+  }
+  let config = match parse_cli(inputs) {
+    Ok(config) => config
+    Err(message) => {
+      node_write_error("\{message}\n")
+      node_set_exit_code(2)
+      return
+    }
+  }
+  let before = match read_text(config.before_path) {
+    Ok(source) => source
+    Err(message) => {
+      node_write_error("\{message}\n")
+      node_set_exit_code(2)
+      return
+    }
+  }
+  let after = match read_text(config.after_path) {
+    Ok(source) => source
+    Err(message) => {
+      node_write_error("\{message}\n")
+      node_set_exit_code(2)
+      return
+    }
+  }
+  let routes = match read_text(config.routes_path) {
+    Ok(source) => source
+    Err(message) => {
+      node_write_error("\{message}\n")
+      node_set_exit_code(2)
+      return
+    }
+  }
+  match
+    assess_csv_inputs(
+      config.before_path,
+      before,
+      config.after_path,
+      after,
+      config.routes_path,
+      routes,
+    ) {
+    Ok(report) => {
+      node_write_output(report.text)
+      if config.fail_on_new_invalid && report.newly_invalid > 0 {
+        node_set_exit_code(3)
+      }
+    }
+    Err(message) => {
+      node_write_error(message)
+      node_set_exit_code(2)
+    }
   }
 }
