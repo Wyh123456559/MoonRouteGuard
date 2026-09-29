@@ -43,12 +43,13 @@ struct CliConfig {
   routes_path : String
   fail_on_new_invalid : Bool
   json : Bool
-  slurm_path : String?
+  before_slurm_path : String?
+  after_slurm_path : String?
 }
 
 ///|
 fn usage() -> String {
-  "usage: routeguard [--json] [--fail-on-new-invalid] [--slurm POLICY.json] BEFORE.csv AFTER.csv ROUTES.csv"
+  "usage: routeguard [--json] [--fail-on-new-invalid] [--slurm POLICY.json | --before-slurm OLD.json --after-slurm NEW.json] BEFORE.csv AFTER.csv ROUTES.csv"
 }
 
 ///|
@@ -56,19 +57,29 @@ fn parse_cli(argv : Array[String]) -> Result[CliConfig, String] {
   let mut start = 0
   let mut fail_on_new_invalid = false
   let mut json = false
-  let mut slurm_path : String? = None
+  let mut shared_slurm_path : String? = None
+  let mut before_slurm_path : String? = None
+  let mut after_slurm_path : String? = None
   while start < argv.length() && argv[start].has_prefix("--") {
     if argv[start] == "--fail-on-new-invalid" && !fail_on_new_invalid {
       fail_on_new_invalid = true
     } else if argv[start] == "--json" && !json {
       json = true
-    } else if argv[start] == "--slurm" && slurm_path is None {
+    } else if (argv[start] == "--slurm" && shared_slurm_path is None) ||
+      (argv[start] == "--before-slurm" && before_slurm_path is None) ||
+      (argv[start] == "--after-slurm" && after_slurm_path is None) {
       if start + 1 >= argv.length() ||
         argv[start + 1].is_empty() ||
         argv[start + 1].has_prefix("--") {
         return Err(usage())
       }
-      slurm_path = Some(argv[start + 1])
+      if argv[start] == "--slurm" {
+        shared_slurm_path = Some(argv[start + 1])
+      } else if argv[start] == "--before-slurm" {
+        before_slurm_path = Some(argv[start + 1])
+      } else {
+        after_slurm_path = Some(argv[start + 1])
+      }
       start = start + 1
     } else {
       return Err(usage())
@@ -83,13 +94,25 @@ fn parse_cli(argv : Array[String]) -> Result[CliConfig, String] {
       return Err(usage())
     }
   }
+  if shared_slurm_path is Some(_) &&
+    (before_slurm_path is Some(_) || after_slurm_path is Some(_)) {
+    return Err(usage())
+  }
+  match shared_slurm_path {
+    Some(path) => {
+      before_slurm_path = Some(path)
+      after_slurm_path = Some(path)
+    }
+    None => ()
+  }
   Ok({
     before_path: argv[start],
     after_path: argv[start + 1],
     routes_path: argv[start + 2],
     fail_on_new_invalid,
     json,
-    slurm_path,
+    before_slurm_path,
+    after_slurm_path,
   })
 }
 
@@ -113,6 +136,31 @@ struct CliReport {
 }
 
 ///|
+struct PolicyApplied {
+  vrps : Array[@lib.Vrp]
+  stats : @lib.SlurmApplyResult?
+}
+
+///|
+fn apply_policy_source(
+  vrps : Array[@lib.Vrp],
+  path : String?,
+  source : String?,
+) -> Result[PolicyApplied, String] {
+  match source {
+    Some(source) => {
+      let policy = match @lib.parse_slurm_json(source) {
+        Ok(value) => value
+        Err(message) => return Err("\{path.unwrap_or("SLURM")}: \{message}\n")
+      }
+      let stats = policy.apply(vrps)
+      Ok({ vrps: stats.vrps, stats: Some(stats), })
+    }
+    None => Ok({ vrps, stats: None, })
+  }
+}
+
+///|
 fn assess_csv_inputs(
   before_path : String,
   before_source : String,
@@ -120,8 +168,10 @@ fn assess_csv_inputs(
   after_source : String,
   routes_path : String,
   routes_source : String,
-  slurm_path : String?,
-  slurm_source : String?,
+  before_slurm_path : String?,
+  before_slurm_source : String?,
+  after_slurm_path : String?,
+  after_slurm_source : String?,
 ) -> Result[CliReport, String] {
   let before = @lib.parse_vrp_csv(before_source)
   let after = @lib.parse_vrp_csv(after_source)
@@ -135,43 +185,42 @@ fn assess_csv_inputs(
     return Err(error_text)
   }
   let diff = @lib.compare_snapshots(before.records, after.records)
-  let mut previous_vrps = before.records.map(record => record.vrp)
-  let mut current_vrps = after.records.map(record => record.vrp)
-  let mut previous_policy : @lib.SlurmApplyResult? = None
-  let mut current_policy : @lib.SlurmApplyResult? = None
-  match slurm_source {
-    Some(source) => {
-      let policy = match @lib.parse_slurm_json(source) {
-        Ok(value) => value
-        Err(message) =>
-          return Err("\{slurm_path.unwrap_or("SLURM")}: \{message}\n")
-      }
-      let before_applied = policy.apply(previous_vrps)
-      let after_applied = policy.apply(current_vrps)
-      previous_vrps = before_applied.vrps
-      current_vrps = after_applied.vrps
-      previous_policy = Some(before_applied)
-      current_policy = Some(after_applied)
-    }
-    None => ()
+  let previous = match
+    apply_policy_source(
+      before.records.map(record => record.vrp),
+      before_slurm_path,
+      before_slurm_source,
+    ) {
+    Ok(value) => value
+    Err(message) => return Err(message)
+  }
+  let current = match
+    apply_policy_source(
+      after.records.map(record => record.vrp),
+      after_slurm_path,
+      after_slurm_source,
+    ) {
+    Ok(value) => value
+    Err(message) => return Err(message)
   }
   let impact = @lib.assess_snapshot_impact(
     routes.routes,
-    previous_vrps,
-    current_vrps,
+    previous.vrps,
+    current.vrps,
   )
   let report = StringBuilder()
   report.write_string("VRP snapshot: \{diff.summary()}\n")
-  match previous_policy {
-    Some(before_applied) => {
-      report.write_string("SLURM before: \{before_applied.summary()}\n")
-      match current_policy {
-        Some(after_applied) =>
-          report.write_string("SLURM after: \{after_applied.summary()}\n")
-        None => ()
-      }
+  if previous.stats is Some(_) || current.stats is Some(_) {
+    let before_status = match previous.stats {
+      Some(stats) => stats.summary()
+      None => "not applied"
     }
-    None => ()
+    let after_status = match current.stats {
+      Some(stats) => stats.summary()
+      None => "not applied"
+    }
+    report.write_string("SLURM before: \{before_status}\n")
+    report.write_string("SLURM after: \{after_status}\n")
   }
   report.write_string("Route impact: \{impact.summary()}\n")
   let mut newly_invalid = 0
@@ -184,18 +233,14 @@ fn assess_csv_inputs(
     report.write_string("\n")
   }
   report.write_string("Newly invalid routes: \{newly_invalid}\n")
-  let json = match previous_policy {
-    Some(before_applied) =>
-      match current_policy {
-        Some(after_applied) =>
-          @lib.write_assessment_json(
-            diff,
-            impact,
-            slurm=(before_applied, after_applied),
-          )
-        None => @lib.write_assessment_json(diff, impact)
-      }
-    None => @lib.write_assessment_json(diff, impact)
+  let json = if previous.stats is Some(_) || current.stats is Some(_) {
+    @lib.write_assessment_json(
+      diff,
+      impact,
+      slurm=(previous.stats, current.stats),
+    )
+  } else {
+    @lib.write_assessment_json(diff, impact)
   }
   Ok({ text: report.to_string(), json, newly_invalid, })
 }
@@ -208,6 +253,18 @@ fn read_text(path : String) -> Result[String, String] {
     return Err("routeguard: unable to read \{path}: \{read_error}")
   }
   Ok(source)
+}
+
+///|
+fn read_optional_text(path : String?) -> Result[String?, String] {
+  match path {
+    Some(path) =>
+      match read_text(path) {
+        Ok(source) => Ok(Some(source))
+        Err(message) => Err(message)
+      }
+    None => Ok(None)
+  }
 }
 
 ///|
@@ -249,17 +306,26 @@ fn main {
       return
     }
   }
-  let slurm_source = match config.slurm_path {
-    Some(path) =>
-      match read_text(path) {
-        Ok(source) => Some(source)
-        Err(message) => {
-          node_write_error("\{message}\n")
-          node_set_exit_code(2)
-          return
-        }
+  let before_slurm_source = match read_optional_text(config.before_slurm_path) {
+    Ok(source) => source
+    Err(message) => {
+      node_write_error("\{message}\n")
+      node_set_exit_code(2)
+      return
+    }
+  }
+  let after_slurm_source = if config.before_slurm_path ==
+    config.after_slurm_path {
+    before_slurm_source
+  } else {
+    match read_optional_text(config.after_slurm_path) {
+      Ok(source) => source
+      Err(message) => {
+        node_write_error("\{message}\n")
+        node_set_exit_code(2)
+        return
       }
-    None => None
+    }
   }
   match
     assess_csv_inputs(
@@ -269,8 +335,10 @@ fn main {
       after,
       config.routes_path,
       routes,
-      config.slurm_path,
-      slurm_source,
+      config.before_slurm_path,
+      before_slurm_source,
+      config.after_slurm_path,
+      after_slurm_source,
     ) {
     Ok(report) => {
       if config.json {

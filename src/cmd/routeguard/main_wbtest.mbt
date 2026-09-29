@@ -3,7 +3,8 @@ test "parse command options and file paths" {
   let plain = parse_cli(["old.csv", "new.csv", "routes.csv"]).unwrap()
   assert_eq(plain.fail_on_new_invalid, false)
   assert_eq(plain.json, false)
-  assert_eq(plain.slurm_path, None)
+  assert_eq(plain.before_slurm_path, None)
+  assert_eq(plain.after_slurm_path, None)
   assert_eq(plain.routes_path, "routes.csv")
   let gated = parse_cli([
     "--fail-on-new-invalid", "old.csv", "new.csv", "routes.csv",
@@ -18,7 +19,14 @@ test "parse command options and file paths" {
   let local_config = parse_cli([
     "--json", "--slurm", "local.json", "old.csv", "new.csv", "routes.csv",
   ]).unwrap()
-  assert_eq(local_config.slurm_path, Some("local.json"))
+  assert_eq(local_config.before_slurm_path, Some("local.json"))
+  assert_eq(local_config.after_slurm_path, Some("local.json"))
+  let policy_change = parse_cli([
+    "--before-slurm", "old.json", "--after-slurm", "new.json", "old.csv", "new.csv",
+    "routes.csv",
+  ]).unwrap()
+  assert_eq(policy_change.before_slurm_path, Some("old.json"))
+  assert_eq(policy_change.after_slurm_path, Some("new.json"))
   assert_eq(parse_cli([]) is Err(_), true)
   assert_eq(parse_cli(["--unknown", "new.csv", "routes.csv"]) is Err(_), true)
   assert_eq(
@@ -28,6 +36,14 @@ test "parse command options and file paths" {
   )
   assert_eq(
     parse_cli(["--slurm", "old.csv", "new.csv", "routes.csv"]) is Err(_),
+    true,
+  )
+  assert_eq(
+    parse_cli([
+      "--slurm", "shared.json", "--after-slurm", "next.json", "old.csv", "new.csv",
+      "routes.csv",
+    ])
+    is Err(_),
     true,
   )
 }
@@ -44,6 +60,8 @@ test "assess CSV snapshots against actual route rows" {
     after,
     "routes.csv",
     routes,
+    None,
+    None,
     None,
     None,
   ).unwrap()
@@ -75,6 +93,8 @@ test "reject malformed input before producing an assessment" {
     routes,
     None,
     None,
+    None,
+    None,
   )
   assert_eq(result is Err(_), true)
   guard result is Err(message) else { return }
@@ -95,6 +115,8 @@ test "apply one local policy to both snapshots before assessing routes" {
     after,
     "routes.csv",
     routes,
+    Some("local.json"),
+    Some(policy),
     Some("local.json"),
     Some(policy),
   ).unwrap()
@@ -118,7 +140,47 @@ test "report policy parse errors with the policy path" {
     routes,
     Some("bad.json"),
     Some("{"),
+    None,
+    None,
   )
   guard result is Err(message) else { return }
   assert_eq(message, "bad.json: invalid JSON\n")
+}
+
+///|
+test "preflight a SLURM rollout and rollback against unchanged VRPs" {
+  let snapshot = "ASN,IP Prefix,Max Length,Trust Anchor\nAS64500,203.0.113.0/24,24,arin\n"
+  let routes = "ASN,IP Prefix\nAS64496,203.0.113.0/24\n"
+  let policy = "{\"slurmVersion\":1,\"validationOutputFilters\":{\"prefixFilters\":[{\"asn\":64500}],\"bgpsecFilters\":[]},\"locallyAddedAssertions\":{\"prefixAssertions\":[{\"asn\":64496,\"prefix\":\"203.0.113.0/24\"}],\"bgpsecAssertions\":[]}}"
+  let rollout = assess_csv_inputs(
+    "old.csv",
+    snapshot,
+    "new.csv",
+    snapshot,
+    "routes.csv",
+    routes,
+    None,
+    None,
+    Some("new-policy.json"),
+    Some(policy),
+  ).unwrap()
+  assert_eq(rollout.newly_invalid, 0)
+  assert_eq(rollout.text.contains("invalid -> valid"), true)
+  assert_eq(rollout.text.contains("SLURM before: not applied"), true)
+  assert_eq(rollout.json.contains("\"before\":null,\"after\":"), true)
+  let rollback = assess_csv_inputs(
+    "old.csv",
+    snapshot,
+    "new.csv",
+    snapshot,
+    "routes.csv",
+    routes,
+    Some("old-policy.json"),
+    Some(policy),
+    None,
+    None,
+  ).unwrap()
+  assert_eq(rollback.newly_invalid, 1)
+  assert_eq(rollback.text.contains("valid -> invalid"), true)
+  assert_eq(rollback.json.contains("\"after\":null"), true)
 }

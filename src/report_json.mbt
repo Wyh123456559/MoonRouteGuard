@@ -53,6 +53,17 @@ fn write_slurm_apply_json(
 }
 
 ///|
+fn write_optional_slurm_apply_json(
+  buffer : StringBuilder,
+  applied : SlurmApplyResult?,
+) -> Unit {
+  match applied {
+    Some(result) => write_slurm_apply_json(buffer, result)
+    None => buffer.write_string("null")
+  }
+}
+
+///|
 fn write_vrp_record_json(buffer : StringBuilder, record : VrpRecord) -> Unit {
   buffer.write_string("{\"asn\":")
   buffer.write_string(record.vrp.asn().to_string())
@@ -76,7 +87,7 @@ fn write_vrp_record_json(buffer : StringBuilder, record : VrpRecord) -> Unit {
 pub fn write_assessment_json(
   diff : SnapshotDiff,
   impact : SnapshotImpact,
-  slurm? : (SlurmApplyResult, SlurmApplyResult),
+  slurm? : (SlurmApplyResult?, SlurmApplyResult?),
 ) -> String {
   let buffer = StringBuilder()
   let mut newly_invalid = 0
@@ -89,9 +100,9 @@ pub fn write_assessment_json(
   match slurm {
     Some((before, after)) => {
       buffer.write_string(",\"slurm\":{\"before\":")
-      write_slurm_apply_json(buffer, before)
+      write_optional_slurm_apply_json(buffer, before)
       buffer.write_string(",\"after\":")
-      write_slurm_apply_json(buffer, after)
+      write_optional_slurm_apply_json(buffer, after)
       buffer.write_char('}')
     }
     None => ()
