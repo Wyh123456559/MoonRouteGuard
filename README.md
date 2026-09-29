@@ -18,6 +18,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - correct handling of overlapping VRPs where any authorizing payload makes the
   route valid;
 - Routinator `csv` and quoted `csvcompat` VRP input with trust-anchor labels;
+- mixed IPv4/IPv6 Routinator CSV parsing through a separate dual-stack API;
 - two-column IPv4 route CSV input with line-numbered diagnostics;
 - deterministic Routinator `csv` and `csvcompat` output with round-trip safety;
 - recoverable, line-numbered diagnostics for malformed or unsupported rows;
@@ -124,9 +125,11 @@ println(index.validate(route).summary())
 ```
 
 The IPv6 core is available through its own types and validation functions.
-CSV, SLURM, snapshot comparison, and RPKI-RTR adapters currently accept IPv4
-payloads only. IPv6 text with zone identifiers or embedded dotted IPv4 is not
-accepted by the prefix parser.
+`parse_dual_stack_vrp_csv` reads both address families from a single Routinator
+snapshot while preserving trust-anchor labels and line-numbered diagnostics.
+The older `parse_vrp_csv` remains IPv4-only. SLURM, snapshot comparison, and
+RPKI-RTR adapters currently accept IPv4 payloads only. IPv6 text with zone
+identifiers or embedded dotted IPv4 is not accepted by the prefix parser.
 
 The accepted four-column layout follows Routinator's documented
 [`csv` and `csvcompat` formats](https://routinator.docs.nlnetlabs.nl/en/stable/output-formats.html).

@@ -18,6 +18,8 @@ pub fn decode_rtr_pdus(Bytes) -> Result[Array[RtrPdu], String]
 
 pub fn encode_rtr_pdu(RtrPdu) -> Result[Bytes, String]
 
+pub fn parse_dual_stack_vrp_csv(StringView) -> DualStackVrpCsvResult
+
 pub fn parse_route_csv(StringView) -> RouteCsvResult
 
 pub fn parse_slurm_json(StringView) -> Result[SlurmPolicy, String]
@@ -50,6 +52,13 @@ pub(all) struct CsvDiagnostic {
 pub fn CsvDiagnostic::equal(Self, Self) -> Bool
 pub fn CsvDiagnostic::not_equal(Self, Self) -> Bool
 pub fn CsvDiagnostic::to_repr(Self) -> @debug.Repr
+
+pub(all) struct DualStackVrpCsvResult {
+  ipv4_records : Array[VrpRecord]
+  ipv6_records : Array[Ipv6VrpRecord]
+  diagnostics : Array[CsvDiagnostic]
+}
+pub fn DualStackVrpCsvResult::is_valid(Self) -> Bool
 
 pub struct Ipv4Prefix {
   address : UInt
@@ -130,6 +139,11 @@ pub(all) struct Ipv6VrpMatch {
 pub fn Ipv6VrpMatch::equal(Self, Self) -> Bool
 pub fn Ipv6VrpMatch::not_equal(Self, Self) -> Bool
 pub fn Ipv6VrpMatch::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Ipv6VrpRecord {
+  vrp : Ipv6Vrp
+  trust_anchor : String
+}
 
 pub struct RouteAnnouncement {
   prefix : Ipv4Prefix
