@@ -34,11 +34,11 @@ implementation. Applications provide VRPs obtained from a trusted validator.
   covering VRP and ASN or prefix-length mismatch;
 - dual-stack Node.js command-line assessment of three CSV files, with an
   optional failure exit code for newly invalid routes;
-- RFC 8416 SLURM policy rollout and rollback simulation in the command-line
-  assessment;
+- RFC 8416 IPv4/IPv6 SLURM policy rollout and rollback simulation in the
+  command-line assessment;
 - deterministic JSON assessment reports with exact added/removed VRP records,
   trust-anchor labels, and old/new route evidence;
-- RFC 8416 IPv4 prefix filters and locally added assertions;
+- RFC 8416 IPv4/IPv6 prefix filters and locally added assertions;
 - strict RFC 8416 JSON parsing with atomic configuration rejection;
 - deterministic RFC 8416 JSON output with parse/write round-trip safety;
 - [RFC 8210](https://www.rfc-editor.org/rfc/rfc8210.html) version 1 control and
@@ -80,6 +80,7 @@ Run the Node.js command-line example and checks:
 ```text
 moon run --target js src/cmd/routeguard -- examples/before.csv examples/after.csv examples/routes.csv
 moon run --target js src/cmd/routeguard -- --json examples/before-dual.csv examples/after-dual.csv examples/routes-dual.csv
+moon run --target js src/cmd/routeguard -- --json --slurm examples/slurm-dual.json examples/before-dual.csv examples/after-dual.csv examples/routes-dual.csv
 moon check --target wasm --deny-warn
 moon test --target wasm --deny-warn
 moon test --target js --deny-warn
@@ -102,6 +103,11 @@ To model the same local exception policy on both snapshots, add
 still describes the raw validator output; route impact uses the effective VRPs
 after SLURM. Text and JSON output include the policy's filter and assertion
 counts. The example policy prevents the sample route from becoming Invalid.
+For a dual-stack example, use `--slurm examples/slurm-dual.json` with the
+`*-dual.csv` files. ASN-only filters apply to both address families, while a
+prefix filter applies only to its own family. IPv6 filter and assertion results
+are reported separately as `IPv6 SLURM` in text and `ipv6Slurm` in JSON;
+the existing `slurm` JSON section continues to report IPv4 statistics.
 Use `--before-slurm OLD.json` and/or `--after-slurm NEW.json` to evaluate a
 policy rollout, replacement, or rollback. An omitted side uses the validator
 VRPs without local exceptions. The shared `--slurm` option cannot be combined
@@ -117,10 +123,9 @@ case and 2 for file or parse errors; `moon run` may normalize nonzero codes to
 1. For CI that needs the exact code, build with `moon build --target js` and run
 `node _build/js/debug/build/cmd/routeguard/routeguard.js` with the same arguments.
 The CLI reads mixed IPv4/IPv6 CSV input and requires Node.js; the library
-remains portable across Wasm, Wasm-GC, and JavaScript. SLURM policies currently
-affect IPv4 VRPs only; IPv6 routes are still evaluated against unmodified IPv6
-VRPs when a policy is supplied. CLI reports group IPv4 and IPv6 transitions by
-address family rather than preserving interleaved route-row order.
+remains portable across Wasm, Wasm-GC, and JavaScript. CLI reports group IPv4
+and IPv6 transitions by address family rather than preserving interleaved
+route-row order.
 Added and removed snapshot records include their trust-anchor labels. Covering
 VRPs inside route decisions do not yet carry source labels because the current
 validation decision model retains payloads but not their provenance.
@@ -146,8 +151,8 @@ snapshot while preserving trust-anchor labels and line-numbered diagnostics.
 The older `parse_vrp_csv` remains IPv4-only. Mixed route lists can be read with
 `parse_dual_stack_route_csv`; IPv6 snapshots can be compared with
 `compare_ipv6_snapshots` and assessed with `assess_ipv6_snapshot_impact`.
-SLURM and RPKI-RTR adapters currently accept IPv4 payloads only. IPv6 text with
-zone identifiers or embedded dotted IPv4 is not accepted by the prefix parser.
+RPKI-RTR adapters currently accept IPv4 payloads only. IPv6 text with zone
+identifiers or embedded dotted IPv4 is not accepted by the prefix parser.
 
 The accepted four-column layout follows Routinator's documented
 [`csv` and `csvcompat` formats](https://routinator.docs.nlnetlabs.nl/en/stable/output-formats.html).
@@ -230,6 +235,7 @@ The same policy can be loaded from a complete SLURM document:
 ```moonbit
 let policy = @moonrouteguard.parse_slurm_json(source).unwrap()
 let local = policy.apply(payloads)
+let ipv6_local = policy.apply_ipv6(ipv6_payloads)
 ```
 
 Validated policies can be normalized for review or checked into configuration
@@ -239,15 +245,16 @@ repositories:
 let normalized = @moonrouteguard.write_slurm_json(policy)
 ```
 
-The writer preserves filter and assertion order, escapes comments through the
-standard JSON encoder, emits empty BGPsec sections, and omits a redundant
+The writer preserves filter and assertion order, escapes filter comments through
+the standard JSON encoder, emits empty BGPsec sections, and omits a redundant
 `maxPrefixLength` when it equals the asserted prefix length.
 
 The implementation follows [RFC 8416](https://www.rfc-editor.org/rfc/rfc8416.html)
 ordering: filters apply to validated RPKI output first, then local assertions
 are appended without exact duplicates. The parser rejects unknown members and
 unsupported configurations as a whole. Prefix-only, ASN-only, and combined
-prefix-and-ASN filters are supported; IPv6 and BGPsec rules are not yet.
+prefix-and-ASN filters are supported for IPv4 and IPv6. ASN-only filters span
+both families. BGPsec rules are not yet supported.
 
 RPKI-RTR version 1 data can be exchanged as binary PDUs without coupling the
 library to a particular socket implementation:
@@ -266,9 +273,9 @@ the protocol's requirement to ignore reserved fields on receipt.
 
 ## Next steps
 
-Planned work includes IPv6 support in SLURM and RPKI-RTR adapters, BGPsec
-SLURM rules, Router Key and Error Report PDUs, and an RPKI-RTR session state
-machine. These capabilities are not part of the current release.
+Planned work includes IPv6 support in RPKI-RTR adapters, BGPsec SLURM rules,
+Router Key and Error Report PDUs, and an RPKI-RTR session state machine. These
+capabilities are not part of the current release.
 
 ## License
 

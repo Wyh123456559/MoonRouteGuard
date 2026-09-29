@@ -13,8 +13,8 @@ const input = [
   join(fixture, "routes.csv"),
 ];
 
-function assess(extra = []) {
-  return spawnSync(process.execPath, [executable, ...extra, "--json", ...input], {
+function assess(extra = [], files = input) {
+  return spawnSync(process.execPath, [executable, ...extra, "--json", ...files], {
     cwd: root,
     encoding: "utf8",
   });
@@ -54,4 +54,34 @@ assert.equal(gated.error, undefined, String(gated.error));
 assert.equal(gated.status, 3, gated.stderr);
 assert.deepEqual(JSON.parse(gated.stdout), report);
 
-console.log("Real-source fixture: 4 observed routes match captured Routinator results; scenario gate exits 3.");
+const baseline = join(fixture, "vrps-before.csv");
+const policy = join(fixture, "ipv6-slurm-scenario.json");
+const policyRun = assess(
+  ["--fail-on-new-invalid", "--after-slurm", policy],
+  [baseline, baseline, join(fixture, "routes.csv")],
+);
+assert.equal(policyRun.error, undefined, String(policyRun.error));
+assert.equal(policyRun.status, 3, policyRun.stderr);
+const policyReport = JSON.parse(policyRun.stdout);
+assert.deepEqual([policyReport.snapshot.added, policyReport.snapshot.removed], [0, 0]);
+assert.deepEqual([policyReport.ipv6Snapshot.added, policyReport.ipv6Snapshot.removed], [0, 0]);
+assert.deepEqual(
+  [policyReport.routeImpact.checked, policyReport.routeImpact.changed],
+  [3, 0],
+);
+assert.deepEqual(
+  [policyReport.ipv6RouteImpact.checked, policyReport.ipv6RouteImpact.newlyInvalid],
+  [1, 1],
+);
+assert.equal(policyReport.ipv6Slurm.before, null);
+assert.equal(policyReport.ipv6Slurm.after.filtered, 1);
+assert.equal(policyReport.ipv6Slurm.after.effectiveVrps, 1);
+assert.deepEqual(
+  [
+    policyReport.ipv6RouteImpact.changes[0].before.status,
+    policyReport.ipv6RouteImpact.changes[0].after.status,
+  ],
+  ["valid", "invalid"],
+);
+
+console.log("Real-source fixture: 4 observed routes, synthetic snapshot and IPv6 SLURM gates verified.");

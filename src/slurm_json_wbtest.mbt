@@ -89,7 +89,7 @@ test "reject filters without prefix or ASN" {
 }
 
 ///|
-test "reject fractional ASNs and IPv6 entries" {
+test "reject fractional ASNs and malformed IPv6 entries" {
   let fractional = slurm_document(
     "1", "[{\"asn\":64496.5}]", "[]", "[]", "[]", "",
   )
@@ -98,11 +98,61 @@ test "reject fractional ASNs and IPv6 entries" {
     "validationOutputFilters.prefixFilters[0].asn must be an unsigned 32-bit integer",
   )
   let ipv6 = slurm_document(
-    "1", "[{\"prefix\":\"2001:db8::/32\"}]", "[]", "[]", "[]", "",
+    "1", "[{\"prefix\":\"2001:db8::1/32\"}]", "[]", "[]", "[]", "",
   )
   assert_eq(
     parse_slurm_json(ipv6).unwrap_err(),
-    "validationOutputFilters.prefixFilters[0].prefix uses unsupported IPv6",
+    "validationOutputFilters.prefixFilters[0].prefix: IPv6 prefix has host bits set: 2001:db8::1/32",
+  )
+}
+
+///|
+test "parse mixed-family SLURM and apply IPv6 rules" {
+  let source = slurm_document(
+    "1", "[{\"prefix\":\"192.0.2.0/24\"},{\"prefix\":\"2001:db8::/32\",\"asn\":64500},{\"asn\":64501}]",
+    "[]", "[{\"prefix\":\"2001:db8:1::/48\",\"asn\":64496},{\"prefix\":\"198.51.100.0/24\",\"asn\":64496}]",
+    "[]", "",
+  )
+  let policy = parse_slurm_json(source).unwrap()
+  assert_eq(policy.filters.length(), 3)
+  assert_eq(policy.assertions.length(), 1)
+  assert_eq(policy.ipv6_assertions.length(), 1)
+  assert_eq(policy.ipv6_assertions[0].max_length(), 48)
+  let ipv6_input = [
+    slurm_ipv6_vrp("2001:db8::/32", 48, 64500U),
+    slurm_ipv6_vrp("2001:db9::/32", 48, 64501U),
+  ]
+  let ipv6 = policy.apply_ipv6(ipv6_input)
+  assert_eq(ipv6.filtered, 2)
+  assert_eq(ipv6.vrps.length(), 1)
+  assert_eq(ipv6.vrps[0].asn(), 64496U)
+  let ipv4_input = [
+    slurm_vrp("192.0.2.0/24", 24, 64500U),
+    slurm_vrp("203.0.113.0/24", 24, 64501U),
+  ]
+  let ipv4 = policy.apply(ipv4_input)
+  assert_eq(ipv4.filtered, 2)
+  assert_eq(ipv4.vrps.length(), 1)
+  assert_eq(ipv4.vrps[0].prefix().to_string(), "198.51.100.0/24")
+}
+
+///|
+test "validate IPv6 assertion maximum lengths atomically" {
+  let too_short = slurm_document(
+    "1", "[]", "[]", "[{\"prefix\":\"2001:db8::/32\",\"asn\":64496,\"maxPrefixLength\":31}]",
+    "[]", "",
+  )
+  assert_eq(
+    parse_slurm_json(too_short).unwrap_err(),
+    "locallyAddedAssertions.prefixAssertions[0]: IPv6 VRP maximum length must be between the prefix length and 128",
+  )
+  let too_long = slurm_document(
+    "1", "[]", "[]", "[{\"prefix\":\"2001:db8::/32\",\"asn\":64496,\"maxPrefixLength\":129}]",
+    "[]", "",
+  )
+  assert_eq(
+    parse_slurm_json(too_long).unwrap_err(),
+    "locallyAddedAssertions.prefixAssertions[0]: IPv6 VRP maximum length must be between the prefix length and 128",
   )
 }
 

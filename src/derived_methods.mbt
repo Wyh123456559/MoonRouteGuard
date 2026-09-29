@@ -105,10 +105,22 @@ pub extend SlurmApplyResult with Eq::{not_equal, equal}
 pub extend SlurmApplyResult with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
+pub extend Ipv6SlurmApplyResult with Eq::{not_equal, equal}
+
+///|
+pub extend Ipv6SlurmApplyResult with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub extend SlurmVrpKey with Eq::{not_equal, equal}
 
 ///|
 pub extend SlurmVrpKey with Hash::{hash, hash_combine}
+
+///|
+pub extend Ipv6SlurmVrpKey with Eq::{not_equal, equal}
+
+///|
+pub extend Ipv6SlurmVrpKey with Hash::{hash, hash_combine}
 
 ///|
 pub extend SlurmPolicy with Eq::{not_equal, equal}

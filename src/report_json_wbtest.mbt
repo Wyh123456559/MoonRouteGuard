@@ -95,3 +95,24 @@ test "serialize IPv6 VRP changes and route evidence beside IPv4 results" {
   )
   let _ = @json.parse(output)
 }
+
+///|
+test "serialize IPv6 SLURM rollout statistics without changing IPv4 fields" {
+  let prefix = Ipv6Prefix::parse("2001:db8::/32").unwrap()
+  let assertion = ipv6_slurm_assertion(prefix, 64496U, max_length=48).unwrap()
+  let stats = apply_ipv6_slurm([], [], [assertion])
+  let output = write_assessment_json(
+    compare_snapshots([], []),
+    assess_snapshot_impact([], [], []),
+    slurm=(None, None),
+    ipv6_slurm=(None, Some(stats)),
+  )
+  assert_eq(output.contains("\"slurm\":{\"before\":null,\"after\":null}"), true)
+  assert_eq(
+    output.contains(
+      "\"ipv6Slurm\":{\"before\":null,\"after\":{\"effectiveVrps\":1,\"filtered\":0,\"duplicateAssertions\":0}}",
+    ),
+    true,
+  )
+  let _ = @json.parse(output)
+}

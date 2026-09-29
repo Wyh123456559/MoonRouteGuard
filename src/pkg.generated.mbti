@@ -6,6 +6,8 @@ import {
 }
 
 // Values
+pub fn apply_ipv6_slurm(Array[Ipv6Vrp], Array[SlurmPrefixFilter], Array[Ipv6Vrp]) -> Ipv6SlurmApplyResult
+
 pub fn apply_slurm(Array[Vrp], Array[SlurmPrefixFilter], Array[Vrp]) -> SlurmApplyResult
 
 pub fn assess_ipv6_snapshot_impact(Array[Ipv6RouteAnnouncement], Array[Ipv6Vrp], Array[Ipv6Vrp]) -> Ipv6SnapshotImpact
@@ -21,6 +23,8 @@ pub fn decode_rtr_pdu(Bytes) -> Result[RtrPdu, String]
 pub fn decode_rtr_pdus(Bytes) -> Result[Array[RtrPdu], String]
 
 pub fn encode_rtr_pdu(RtrPdu) -> Result[Bytes, String]
+
+pub fn ipv6_slurm_assertion(Ipv6Prefix, UInt, max_length? : Int) -> Result[Ipv6Vrp, String]
 
 pub fn parse_dual_stack_route_csv(StringView) -> DualStackRouteCsvResult
 
@@ -42,7 +46,7 @@ pub fn validate_route(RouteAnnouncement, Array[Vrp]) -> ValidationDecision
 
 pub fn validate_routes(Array[RouteAnnouncement], Array[Vrp]) -> Array[ValidationDecision]
 
-pub fn write_assessment_json(SnapshotDiff, SnapshotImpact, slurm? : (SlurmApplyResult?, SlurmApplyResult?), ipv6? : (Ipv6SnapshotDiff, Ipv6SnapshotImpact)) -> String
+pub fn write_assessment_json(SnapshotDiff, SnapshotImpact, slurm? : (SlurmApplyResult?, SlurmApplyResult?), ipv6_slurm? : (Ipv6SlurmApplyResult?, Ipv6SlurmApplyResult?), ipv6? : (Ipv6SnapshotDiff, Ipv6SnapshotImpact)) -> String
 
 pub fn write_slurm_json(SlurmPolicy) -> String
 
@@ -119,6 +123,22 @@ pub(all) struct Ipv6RouteImpact {
 }
 pub fn Ipv6RouteImpact::explanation(Self) -> String
 pub fn Ipv6RouteImpact::summary(Self) -> String
+
+pub(all) struct Ipv6SlurmApplyResult {
+  vrps : Array[Ipv6Vrp]
+  filtered : Int
+  duplicate_assertions : Int
+} derive(Eq, @debug.Debug)
+pub fn Ipv6SlurmApplyResult::equal(Self, Self) -> Bool
+pub fn Ipv6SlurmApplyResult::not_equal(Self, Self) -> Bool
+pub fn Ipv6SlurmApplyResult::summary(Self) -> String
+pub fn Ipv6SlurmApplyResult::to_repr(Self) -> @debug.Repr
+
+type Ipv6SlurmVrpKey derive(Eq, Hash)
+pub fn Ipv6SlurmVrpKey::equal(Self, Self) -> Bool
+pub fn Ipv6SlurmVrpKey::hash(Self) -> Int
+pub fn Ipv6SlurmVrpKey::hash_combine(Self, Hasher) -> Unit
+pub fn Ipv6SlurmVrpKey::not_equal(Self, Self) -> Bool
 
 pub(all) struct Ipv6SnapshotDiff {
   added : Array[Ipv6VrpRecord]
@@ -248,23 +268,30 @@ pub fn SlurmApplyResult::to_repr(Self) -> @debug.Repr
 pub(all) struct SlurmPolicy {
   filters : Array[SlurmPrefixFilter]
   assertions : Array[Vrp]
+  ipv6_assertions : Array[Ipv6Vrp]
+  assertion_is_ipv6 : Array[Bool]
 } derive(Eq, @debug.Debug)
 pub fn SlurmPolicy::apply(Self, Array[Vrp]) -> SlurmApplyResult
+pub fn SlurmPolicy::apply_ipv6(Self, Array[Ipv6Vrp]) -> Ipv6SlurmApplyResult
 pub fn SlurmPolicy::equal(Self, Self) -> Bool
 pub fn SlurmPolicy::not_equal(Self, Self) -> Bool
 pub fn SlurmPolicy::to_repr(Self) -> @debug.Repr
 
 pub struct SlurmPrefixFilter {
   prefix : Ipv4Prefix?
+  ipv6_prefix : Ipv6Prefix?
   asn : UInt?
   comment : String
 } derive(Eq, @debug.Debug)
 pub fn SlurmPrefixFilter::asn(Self) -> UInt?
 pub fn SlurmPrefixFilter::by_asn(UInt, comment? : String) -> Self
+pub fn SlurmPrefixFilter::by_ipv6_prefix(Ipv6Prefix, comment? : String) -> Self
+pub fn SlurmPrefixFilter::by_ipv6_prefix_and_asn(Ipv6Prefix, UInt, comment? : String) -> Self
 pub fn SlurmPrefixFilter::by_prefix(Ipv4Prefix, comment? : String) -> Self
 pub fn SlurmPrefixFilter::by_prefix_and_asn(Ipv4Prefix, UInt, comment? : String) -> Self
 pub fn SlurmPrefixFilter::comment(Self) -> String
 pub fn SlurmPrefixFilter::equal(Self, Self) -> Bool
+pub fn SlurmPrefixFilter::ipv6_prefix(Self) -> Ipv6Prefix?
 pub fn SlurmPrefixFilter::not_equal(Self, Self) -> Bool
 pub fn SlurmPrefixFilter::prefix(Self) -> Ipv4Prefix?
 pub fn SlurmPrefixFilter::to_repr(Self) -> @debug.Repr

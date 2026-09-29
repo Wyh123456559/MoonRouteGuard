@@ -64,6 +64,31 @@ fn write_optional_slurm_apply_json(
 }
 
 ///|
+fn write_ipv6_slurm_apply_json(
+  buffer : StringBuilder,
+  applied : Ipv6SlurmApplyResult,
+) -> Unit {
+  buffer.write_string("{\"effectiveVrps\":")
+  buffer.write_string(applied.vrps.length().to_string())
+  buffer.write_string(",\"filtered\":")
+  buffer.write_string(applied.filtered.to_string())
+  buffer.write_string(",\"duplicateAssertions\":")
+  buffer.write_string(applied.duplicate_assertions.to_string())
+  buffer.write_char('}')
+}
+
+///|
+fn write_optional_ipv6_slurm_apply_json(
+  buffer : StringBuilder,
+  applied : Ipv6SlurmApplyResult?,
+) -> Unit {
+  match applied {
+    Some(result) => write_ipv6_slurm_apply_json(buffer, result)
+    None => buffer.write_string("null")
+  }
+}
+
+///|
 fn write_vrp_record_json(buffer : StringBuilder, record : VrpRecord) -> Unit {
   buffer.write_string("{\"asn\":")
   buffer.write_string(record.vrp.asn().to_string())
@@ -185,10 +210,12 @@ fn write_ipv6_assessment_json(
 /// explain each old and new decision. Exact added and removed VRP records
 /// retain their trust-anchor labels. Per-decision covering VRPs do not carry
 /// labels because the validation decision model does not retain their source.
+/// IPv4 and IPv6 SLURM application statistics occupy separate optional fields.
 pub fn write_assessment_json(
   diff : SnapshotDiff,
   impact : SnapshotImpact,
   slurm? : (SlurmApplyResult?, SlurmApplyResult?),
+  ipv6_slurm? : (Ipv6SlurmApplyResult?, Ipv6SlurmApplyResult?),
   ipv6? : (Ipv6SnapshotDiff, Ipv6SnapshotImpact),
 ) -> String {
   let buffer = StringBuilder()
@@ -205,6 +232,16 @@ pub fn write_assessment_json(
       write_optional_slurm_apply_json(buffer, before)
       buffer.write_string(",\"after\":")
       write_optional_slurm_apply_json(buffer, after)
+      buffer.write_char('}')
+    }
+    None => ()
+  }
+  match ipv6_slurm {
+    Some((before, after)) => {
+      buffer.write_string(",\"ipv6Slurm\":{\"before\":")
+      write_optional_ipv6_slurm_apply_json(buffer, before)
+      buffer.write_string(",\"after\":")
+      write_optional_ipv6_slurm_apply_json(buffer, after)
       buffer.write_char('}')
     }
     None => ()

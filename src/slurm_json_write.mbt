@@ -18,6 +18,14 @@ fn write_slurm_filter(
     }
     None => ()
   }
+  match filter.ipv6_prefix() {
+    Some(prefix) => {
+      buffer.write_string("\"prefix\": ")
+      buffer.write_string(slurm_json_string(prefix.to_string()))
+      needs_comma = true
+    }
+    None => ()
+  }
   match filter.asn() {
     Some(asn) => {
       if needs_comma {
@@ -53,7 +61,23 @@ fn write_slurm_assertion(buffer : StringBuilder, assertion : Vrp) -> Unit {
 }
 
 ///|
-/// Write the supported IPv4 subset of an RFC 8416 SLURM policy.
+fn write_ipv6_slurm_assertion(
+  buffer : StringBuilder,
+  assertion : Ipv6Vrp,
+) -> Unit {
+  buffer.write_string("      {\"prefix\": ")
+  buffer.write_string(slurm_json_string(assertion.prefix().to_string()))
+  buffer.write_string(", \"asn\": ")
+  buffer.write_string(assertion.asn().to_string())
+  if assertion.max_length() != assertion.prefix().length() {
+    buffer.write_string(", \"maxPrefixLength\": ")
+    buffer.write_string(assertion.max_length().to_string())
+  }
+  buffer.write_char('}')
+}
+
+///|
+/// Write the route-origin subset of an RFC 8416 SLURM policy.
 ///
 /// Array order is preserved, insignificant assertion maximum lengths are
 /// omitted, and the result always uses two-space indentation and LF endings.
@@ -76,13 +100,21 @@ pub fn write_slurm_json(policy : SlurmPolicy) -> String {
   buffer.write_string(
     "],\n    \"bgpsecFilters\": []\n  },\n  \"locallyAddedAssertions\": {\n    \"prefixAssertions\": [",
   )
-  if !policy.assertions.is_empty() {
+  if !policy.assertion_is_ipv6.is_empty() {
     buffer.write_char('\n')
-    for index, assertion in policy.assertions {
+    let mut ipv4_index = 0
+    let mut ipv6_index = 0
+    for index, is_ipv6 in policy.assertion_is_ipv6 {
       if index > 0 {
         buffer.write_string(",\n")
       }
-      write_slurm_assertion(buffer, assertion)
+      if is_ipv6 {
+        write_ipv6_slurm_assertion(buffer, policy.ipv6_assertions[ipv6_index])
+        ipv6_index = ipv6_index + 1
+      } else {
+        write_slurm_assertion(buffer, policy.assertions[ipv4_index])
+        ipv4_index = ipv4_index + 1
+      }
     }
     buffer.write_char('\n')
     buffer.write_string("    ")

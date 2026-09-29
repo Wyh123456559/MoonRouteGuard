@@ -138,12 +138,15 @@ struct CliReport {
 ///|
 struct PolicyApplied {
   vrps : Array[@lib.Vrp]
+  ipv6_vrps : Array[@lib.Ipv6Vrp]
   stats : @lib.SlurmApplyResult?
+  ipv6_stats : @lib.Ipv6SlurmApplyResult?
 }
 
 ///|
 fn apply_policy_source(
   vrps : Array[@lib.Vrp],
+  ipv6_vrps : Array[@lib.Ipv6Vrp],
   path : String?,
   source : String?,
 ) -> Result[PolicyApplied, String] {
@@ -154,9 +157,15 @@ fn apply_policy_source(
         Err(message) => return Err("\{path.unwrap_or("SLURM")}: \{message}\n")
       }
       let stats = policy.apply(vrps)
-      Ok({ vrps: stats.vrps, stats: Some(stats), })
+      let ipv6_stats = policy.apply_ipv6(ipv6_vrps)
+      Ok({
+        vrps: stats.vrps,
+        ipv6_vrps: ipv6_stats.vrps,
+        stats: Some(stats),
+        ipv6_stats: Some(ipv6_stats),
+      })
     }
-    None => Ok({ vrps, stats: None, })
+    None => Ok({ vrps, ipv6_vrps, stats: None, ipv6_stats: None, })
   }
 }
 
@@ -189,12 +198,10 @@ fn assess_csv_inputs(
     before.ipv6_records,
     after.ipv6_records,
   )
-  let has_ipv6 = !before.ipv6_records.is_empty() ||
-    !after.ipv6_records.is_empty() ||
-    !routes.ipv6_routes.is_empty()
   let previous = match
     apply_policy_source(
       before.ipv4_records.map(record => record.vrp),
+      before.ipv6_records.map(record => record.vrp),
       before_slurm_path,
       before_slurm_source,
     ) {
@@ -204,12 +211,18 @@ fn assess_csv_inputs(
   let current = match
     apply_policy_source(
       after.ipv4_records.map(record => record.vrp),
+      after.ipv6_records.map(record => record.vrp),
       after_slurm_path,
       after_slurm_source,
     ) {
     Ok(value) => value
     Err(message) => return Err(message)
   }
+  let has_ipv6 = !before.ipv6_records.is_empty() ||
+    !after.ipv6_records.is_empty() ||
+    !routes.ipv6_routes.is_empty() ||
+    !previous.ipv6_vrps.is_empty() ||
+    !current.ipv6_vrps.is_empty()
   let impact = @lib.assess_snapshot_impact(
     routes.ipv4_routes,
     previous.vrps,
@@ -217,8 +230,8 @@ fn assess_csv_inputs(
   )
   let ipv6_impact = @lib.assess_ipv6_snapshot_impact(
     routes.ipv6_routes,
-    before.ipv6_records.map(record => record.vrp),
-    after.ipv6_records.map(record => record.vrp),
+    previous.ipv6_vrps,
+    current.ipv6_vrps,
   )
   let report = StringBuilder()
   report.write_string("VRP snapshot: \{diff.summary()}\n")
@@ -236,6 +249,18 @@ fn assess_csv_inputs(
     }
     report.write_string("SLURM before: \{before_status}\n")
     report.write_string("SLURM after: \{after_status}\n")
+    if has_ipv6 {
+      let before_ipv6_status = match previous.ipv6_stats {
+        Some(stats) => stats.summary()
+        None => "not applied"
+      }
+      let after_ipv6_status = match current.ipv6_stats {
+        Some(stats) => stats.summary()
+        None => "not applied"
+      }
+      report.write_string("IPv6 SLURM before: \{before_ipv6_status}\n")
+      report.write_string("IPv6 SLURM after: \{after_ipv6_status}\n")
+    }
   }
   report.write_string("Route impact: \{impact.summary()}\n")
   if has_ipv6 {
@@ -265,6 +290,7 @@ fn assess_csv_inputs(
       diff,
       impact,
       slurm=(previous.stats, current.stats),
+      ipv6_slurm=(previous.ipv6_stats, current.ipv6_stats),
       ipv6=(ipv6_diff, ipv6_impact),
     )
   } else if has_policy {

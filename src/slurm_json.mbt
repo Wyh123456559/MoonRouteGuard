@@ -1,8 +1,10 @@
 ///|
-/// A validated IPv4 subset of one RFC 8416 SLURM document.
+/// The route-origin subset of one RFC 8416 SLURM document.
 pub(all) struct SlurmPolicy {
   filters : Array[SlurmPrefixFilter]
   assertions : Array[Vrp]
+  ipv6_assertions : Array[Ipv6Vrp]
+  assertion_is_ipv6 : Array[Bool]
 } derive(Eq, Debug)
 
 ///|
@@ -11,6 +13,27 @@ pub fn SlurmPolicy::apply(
   validated : Array[Vrp],
 ) -> SlurmApplyResult {
   apply_slurm(validated, self.filters, self.assertions)
+}
+
+///|
+/// Apply this policy's ASN-only and IPv6 prefix rules to IPv6 VRPs.
+pub fn SlurmPolicy::apply_ipv6(
+  self : SlurmPolicy,
+  validated : Array[Ipv6Vrp],
+) -> Ipv6SlurmApplyResult {
+  apply_ipv6_slurm(validated, self.filters, self.ipv6_assertions)
+}
+
+///|
+priv enum SlurmParsedPrefix {
+  SlurmIpv4(Ipv4Prefix)
+  SlurmIpv6(Ipv6Prefix)
+}
+
+///|
+priv enum SlurmParsedAssertion {
+  SlurmIpv4Assertion(Vrp)
+  SlurmIpv6Assertion(Ipv6Vrp)
 }
 
 ///|
@@ -87,15 +110,18 @@ fn optional_comment(
 fn optional_prefix(
   members : Map[String, Json],
   path : String,
-) -> Result[Ipv4Prefix?, String] {
+) -> Result[SlurmParsedPrefix?, String] {
   match members.get("prefix") {
     None => Ok(None)
     Some(String(text)) => {
       if contains_colon(text) {
-        return Err("\{path}.prefix uses unsupported IPv6")
+        return match Ipv6Prefix::parse(text) {
+          Ok(prefix) => Ok(Some(SlurmIpv6(prefix)))
+          Err(message) => Err("\{path}.prefix: \{message}")
+        }
       }
       match Ipv4Prefix::parse(text) {
-        Ok(prefix) => Ok(Some(prefix))
+        Ok(prefix) => Ok(Some(SlurmIpv4(prefix)))
         Err(message) => Err("\{path}.prefix: \{message}")
       }
     }
@@ -145,16 +171,24 @@ fn parse_prefix_filter(
     Err(message) => return Err(message)
   }
   match (prefix, asn) {
-    (Some(prefix), Some(asn)) =>
+    (Some(SlurmIpv4(prefix)), Some(asn)) =>
       Ok(SlurmPrefixFilter::by_prefix_and_asn(prefix, asn, comment~))
-    (Some(prefix), None) => Ok(SlurmPrefixFilter::by_prefix(prefix, comment~))
+    (Some(SlurmIpv4(prefix)), None) =>
+      Ok(SlurmPrefixFilter::by_prefix(prefix, comment~))
+    (Some(SlurmIpv6(prefix)), Some(asn)) =>
+      Ok(SlurmPrefixFilter::by_ipv6_prefix_and_asn(prefix, asn, comment~))
+    (Some(SlurmIpv6(prefix)), None) =>
+      Ok(SlurmPrefixFilter::by_ipv6_prefix(prefix, comment~))
     (None, Some(asn)) => Ok(SlurmPrefixFilter::by_asn(asn, comment~))
     (None, None) => Err("\{path} must contain prefix, asn, or both")
   }
 }
 
 ///|
-fn parse_prefix_assertion(value : Json, index : Int) -> Result[Vrp, String] {
+fn parse_prefix_assertion(
+  value : Json,
+  index : Int,
+) -> Result[SlurmParsedAssertion, String] {
   let path = "locallyAddedAssertions.prefixAssertions[\{index}]"
   let members = match json_object(value, path) {
     Ok(value) => value
@@ -191,13 +225,17 @@ fn parse_prefix_assertion(value : Json, index : Int) -> Result[Vrp, String] {
         Err(message) => return Err(message)
       }
   }
-  match max_length {
-    Some(length) =>
-      match slurm_assertion(prefix, asn, max_length=length) {
-        Ok(value) => Ok(value)
+  match prefix {
+    SlurmIpv4(prefix) =>
+      match slurm_assertion(prefix, asn, max_length?) {
+        Ok(value) => Ok(SlurmIpv4Assertion(value))
         Err(message) => Err("\{path}: \{message}")
       }
-    None => slurm_assertion(prefix, asn)
+    SlurmIpv6(prefix) =>
+      match ipv6_slurm_assertion(prefix, asn, max_length?) {
+        Ok(value) => Ok(SlurmIpv6Assertion(value))
+        Err(message) => Err("\{path}: \{message}")
+      }
   }
 }
 
@@ -211,10 +249,10 @@ fn require_empty_bgpsec(value : Json, path : String) -> Result[Unit, String] {
 }
 
 ///|
-/// Parse the IPv4 origin-validation subset of an RFC 8416 SLURM JSON file.
+/// Parse the route-origin subset of an RFC 8416 SLURM JSON file.
 ///
 /// The document is rejected atomically on malformed JSON, unknown members,
-/// unsupported versions, IPv6 entries, or non-empty BGPsec sections.
+/// unsupported versions, invalid prefixes, or non-empty BGPsec sections.
 pub fn parse_slurm_json(source : StringView) -> Result[SlurmPolicy, String] {
   let document = @json.parse(source) catch { _ => return Err("invalid JSON") }
   let root = match json_object(document, "SLURM document") {
@@ -322,9 +360,18 @@ pub fn parse_slurm_json(source : StringView) -> Result[SlurmPolicy, String] {
     Err(message) => return Err(message)
   }
   let assertions : Array[Vrp] = []
+  let ipv6_assertions : Array[Ipv6Vrp] = []
+  let assertion_is_ipv6 : Array[Bool] = []
   for index, item in prefix_assertion_items {
     match parse_prefix_assertion(item, index) {
-      Ok(assertion) => assertions.push(assertion)
+      Ok(SlurmIpv4Assertion(assertion)) => {
+        assertions.push(assertion)
+        assertion_is_ipv6.push(false)
+      }
+      Ok(SlurmIpv6Assertion(assertion)) => {
+        ipv6_assertions.push(assertion)
+        assertion_is_ipv6.push(true)
+      }
       Err(message) => return Err(message)
     }
   }
@@ -342,5 +389,5 @@ pub fn parse_slurm_json(source : StringView) -> Result[SlurmPolicy, String] {
     Err(message) => return Err(message)
     Ok(_) => ()
   }
-  Ok({ filters, assertions, })
+  Ok({ filters, assertions, ipv6_assertions, assertion_is_ipv6, })
 }

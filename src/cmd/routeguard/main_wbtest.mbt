@@ -218,7 +218,7 @@ test "assess mixed snapshots and count IPv6 risk in the gate" {
 }
 
 ///|
-test "apply IPv4 SLURM without masking IPv6 risk" {
+test "ASN-only SLURM filters IPv4 and IPv6 without masking risk" {
   let before = "ASN,IP Prefix,Max Length,Trust Anchor\nAS64496,203.0.113.0/24,24,test\nAS64500,2001:db8::/32,48,test\n"
   let after = "ASN,IP Prefix,Max Length,Trust Anchor\nAS64500,203.0.113.0/24,24,test\nAS64501,2001:db8::/32,48,test\n"
   let routes = "ASN,IP Prefix\nAS64496,203.0.113.0/24\nAS64500,2001:db8:1::/48\n"
@@ -238,7 +238,81 @@ test "apply IPv4 SLURM without masking IPv6 risk" {
   assert_eq(report.newly_invalid, 1)
   assert_eq(report.text.contains("Route impact: 0 changed"), true)
   assert_eq(report.text.contains("IPv6 route impact: 1 changed"), true)
+  assert_eq(report.text.contains("not found -> invalid"), true)
   assert_eq(report.json.contains("\"slurm\":{\"before\":"), true)
+  assert_eq(report.json.contains("\"ipv6Slurm\":{\"before\":"), true)
+}
+
+///|
+test "preflight IPv6 SLURM rollout and rollback against unchanged VRPs" {
+  let snapshot = "ASN,IP Prefix,Max Length,Trust Anchor\nAS64496,2001:db8::/32,48,test\n"
+  let routes = "ASN,IP Prefix\nAS64496,2001:db8:1::/48\n"
+  let policy = "{\"slurmVersion\":1,\"validationOutputFilters\":{\"prefixFilters\":[{\"prefix\":\"2001:db8::/32\",\"asn\":64496}],\"bgpsecFilters\":[]},\"locallyAddedAssertions\":{\"prefixAssertions\":[{\"prefix\":\"2001:db8::/32\",\"asn\":64500,\"maxPrefixLength\":48}],\"bgpsecAssertions\":[]}}"
+  let rollout = assess_csv_inputs(
+    "old.csv",
+    snapshot,
+    "new.csv",
+    snapshot,
+    "routes.csv",
+    routes,
+    None,
+    None,
+    Some("new-policy.json"),
+    Some(policy),
+  ).unwrap()
+  assert_eq(rollout.newly_invalid, 1)
+  assert_eq(rollout.text.contains("IPv6 VRP snapshot: +0 -0"), true)
+  assert_eq(rollout.text.contains("IPv6 SLURM before: not applied"), true)
+  assert_eq(
+    rollout.text.contains("IPv6 SLURM after: 1 VRP(s), 1 filtered"),
+    true,
+  )
+  assert_eq(rollout.text.contains("valid -> invalid"), true)
+  assert_eq(rollout.json.contains("\"ipv6Slurm\":{\"before\":null"), true)
+  assert_eq(rollout.json.contains("\"ipv6RouteImpact\":{\"checked\":1"), true)
+  let rollback = assess_csv_inputs(
+    "old.csv",
+    snapshot,
+    "new.csv",
+    snapshot,
+    "routes.csv",
+    routes,
+    Some("old-policy.json"),
+    Some(policy),
+    None,
+    None,
+  ).unwrap()
+  assert_eq(rollback.newly_invalid, 0)
+  assert_eq(rollback.text.contains("invalid -> valid"), true)
+  assert_eq(rollback.json.contains("\"ipv6Slurm\":{\"before\":{"), true)
+  assert_eq(rollback.json.contains("\"after\":null"), true)
+}
+
+///|
+test "shared IPv6 SLURM assertion prevents a snapshot regression" {
+  let before = "ASN,IP Prefix,Max Length,Trust Anchor\nAS64496,2001:db8::/32,48,test\n"
+  let after = "ASN,IP Prefix,Max Length,Trust Anchor\nAS64500,2001:db8::/32,48,test\n"
+  let routes = "ASN,IP Prefix\nAS64496,2001:db8:1::/48\n"
+  let policy = "{\"slurmVersion\":1,\"validationOutputFilters\":{\"prefixFilters\":[{\"asn\":64500}],\"bgpsecFilters\":[]},\"locallyAddedAssertions\":{\"prefixAssertions\":[{\"prefix\":\"2001:db8::/32\",\"asn\":64496,\"maxPrefixLength\":48}],\"bgpsecAssertions\":[]}}"
+  let report = assess_csv_inputs(
+    "old.csv",
+    before,
+    "new.csv",
+    after,
+    "routes.csv",
+    routes,
+    Some("policy.json"),
+    Some(policy),
+    Some("policy.json"),
+    Some(policy),
+  ).unwrap()
+  assert_eq(report.newly_invalid, 0)
+  assert_eq(report.text.contains("IPv6 route impact: 0 changed"), true)
+  assert_eq(
+    report.text.contains("IPv6 SLURM after: 1 VRP(s), 1 filtered"),
+    true,
+  )
+  assert_eq(report.json.contains("\"ipv6Slurm\":{\"before\":{"), true)
 }
 
 ///|

@@ -39,6 +39,13 @@ AS64500 for one IPv4 and one IPv6 route. The expected transitions are two to
 NotFound and two newly Invalid. This exercises snapshot comparison, evidence,
 dual-stack reporting, and the CI risk exit code against real baseline records.
 
+`ipv6-slurm-scenario.json` is another **hypothetical** change. It uses the
+unchanged real baseline CSV on both sides, filters the observed AS3333 IPv6 VRP,
+and adds an AS64500 assertion for that prefix. The observed IPv6 route changes
+from Valid to Invalid, while the three observed IPv4 routes retain their states.
+The raw snapshot difference remains empty; only the after-side local policy
+causes the risk gate to exit with code 3.
+
 From the repository root:
 
 ```text
@@ -47,9 +54,10 @@ node scripts/verify-real-fixture.mjs
 ```
 
 The script runs the compiled CLI offline, compares all four baseline decisions
-and covering-VRP evidence to `reference.json`, checks the scenario outcomes,
-and requires `--fail-on-new-invalid` to exit with code 3. The public endpoints
-are mutable, so later downloads need not reproduce this historical capture.
+and covering-VRP evidence to `reference.json`, checks both hypothetical
+scenarios, and requires `--fail-on-new-invalid` to exit with code 3. The public
+endpoints are mutable, so later downloads need not reproduce this historical
+capture.
 
 As a separate capture-time smoke check, the CLI also accepted the entire
 33,332,136-byte CSV as both before and after inputs with these four routes.

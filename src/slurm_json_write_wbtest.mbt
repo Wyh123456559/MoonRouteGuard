@@ -64,3 +64,19 @@ test "SLURM JSON parse and write round trip" {
   assert_eq(decoded, initial)
   assert_eq(write_slurm_json(decoded), encoded)
 }
+
+///|
+test "mixed IPv4 and IPv6 rules retain order through JSON round trip" {
+  let source = slurm_document(
+    "1", "[{\"prefix\":\"2001:db8::/32\",\"comment\":\"v6\"},{\"asn\":64500},{\"prefix\":\"192.0.2.0/24\"},{\"prefix\":\"2001:db9::/32\",\"asn\":64496}]",
+    "[]", "[{\"prefix\":\"2001:db8:1::/48\",\"asn\":64496},{\"prefix\":\"198.51.100.0/24\",\"asn\":64496},{\"prefix\":\"2001:db9::/32\",\"asn\":64500,\"maxPrefixLength\":64}]",
+    "[]", "",
+  )
+  let policy = parse_slurm_json(source).unwrap()
+  let encoded = write_slurm_json(policy)
+  assert_eq(encoded.contains("\"prefix\": \"2001:db8::/32\""), true)
+  assert_eq(encoded.contains("\"maxPrefixLength\": 64"), true)
+  assert_eq(encoded.contains("\"maxPrefixLength\": 48"), false)
+  assert_eq(parse_slurm_json(encoded).unwrap(), policy)
+  assert_eq(write_slurm_json(parse_slurm_json(encoded).unwrap()), encoded)
+}
