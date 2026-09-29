@@ -54,6 +54,39 @@ pub extend Ipv4Prefix with Eq::{not_equal, equal}
 pub extend Ipv4Prefix with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
+pub extend Ipv6Prefix with Eq::{not_equal, equal}
+
+///|
+pub extend Ipv6Prefix with Hash::{hash, hash_combine}
+
+///|
+pub extend Ipv6Prefix with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Ipv6Vrp with Eq::{not_equal, equal}
+
+///|
+pub extend Ipv6Vrp with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Ipv6RouteAnnouncement with Eq::{not_equal, equal}
+
+///|
+pub extend Ipv6RouteAnnouncement with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Ipv6VrpMatch with Eq::{not_equal, equal}
+
+///|
+pub extend Ipv6VrpMatch with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Ipv6ValidationDecision with Eq::{not_equal, equal}
+
+///|
+pub extend Ipv6ValidationDecision with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub extend RtrPdu with Eq::{not_equal, equal}
 
 ///|

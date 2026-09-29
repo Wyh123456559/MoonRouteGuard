@@ -11,6 +11,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 ## What works
 
 - strict parsing of canonical IPv4 CIDR prefixes;
+- IPv6 CIDR parsing, RFC 5952 formatting, and 128-bit prefix containment;
 - VRP validation for prefix length and `maxLength` consistency;
 - RFC 6811 `Valid`, `Invalid`, and `NotFound` route states;
 - separate evidence for origin-AS and maximum-length mismatches;
@@ -23,6 +24,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
   changes, duplicate suppression, and hash-indexed membership checks;
 - order-preserving batch route validation;
 - indexed validation with at most 33 prefix-key lookups per IPv4 route;
+- IPv6 VRP validation and an index with at most 129 prefix-key lookups per route;
 - route-impact analysis across VRP snapshots with old and new evidence;
 - RFC 8416 IPv4 prefix filters and locally added assertions;
 - strict RFC 8416 JSON parsing with atomic configuration rejection;
@@ -71,6 +73,26 @@ moon test --target wasm --deny-warn
 
 The example prints one valid route, one route rejected for exceeding
 `maxLength`, and one route with no covering VRP.
+
+IPv6 route origin validation uses the same validity states and evidence
+relations. Its prefix parser accepts compressed hexadecimal addresses and
+requires host bits to be zero:
+
+```moonbit
+let prefix = @moonrouteguard.Ipv6Prefix::parse("2001:db8::/32").unwrap()
+let payload = @moonrouteguard.Ipv6Vrp::new(prefix, 48, 64496U).unwrap()
+let route = @moonrouteguard.Ipv6RouteAnnouncement::new(
+  @moonrouteguard.Ipv6Prefix::parse("2001:db8:1::/48").unwrap(),
+  64496U,
+)
+let index = @moonrouteguard.Ipv6VrpIndex::new([payload])
+println(index.validate(route).summary())
+```
+
+The IPv6 core is available through its own types and validation functions.
+CSV, SLURM, snapshot comparison, and RPKI-RTR adapters currently accept IPv4
+payloads only. IPv6 text with zone identifiers or embedded dotted IPv4 is not
+accepted by the prefix parser.
 
 The accepted four-column layout follows Routinator's documented
 [`csv` and `csvcompat` formats](https://routinator.docs.nlnetlabs.nl/en/stable/output-formats.html).
@@ -178,9 +200,10 @@ the protocol's requirement to ignore reserved fields on receipt.
 
 ## Next steps
 
-Planned work includes IPv6 prefixes, BGPsec SLURM rules, Router Key and Error
-Report PDUs, and an RPKI-RTR session state machine. These capabilities are not
-part of the current release.
+Planned work includes IPv6 support in the CSV, SLURM, snapshot comparison, and
+RPKI-RTR adapters, BGPsec SLURM rules, Router Key and Error Report PDUs, and an
+RPKI-RTR session state machine. These capabilities are not part of the current
+release.
 
 ## License
 
