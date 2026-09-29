@@ -1,0 +1,3 @@
+ASN,IP Prefix,Max Length,Trust Anchor
+AS64500,203.0.113.0/24,24,test
+AS64501,2001:db8::/32,48,test

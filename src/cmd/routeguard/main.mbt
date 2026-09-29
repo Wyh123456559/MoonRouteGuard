@@ -173,9 +173,9 @@ fn assess_csv_inputs(
   after_slurm_path : String?,
   after_slurm_source : String?,
 ) -> Result[CliReport, String] {
-  let before = @lib.parse_vrp_csv(before_source)
-  let after = @lib.parse_vrp_csv(after_source)
-  let routes = @lib.parse_route_csv(routes_source)
+  let before = @lib.parse_dual_stack_vrp_csv(before_source)
+  let after = @lib.parse_dual_stack_vrp_csv(after_source)
+  let routes = @lib.parse_dual_stack_route_csv(routes_source)
   let errors = StringBuilder()
   errors.write_string(format_diagnostics(before_path, before.diagnostics))
   errors.write_string(format_diagnostics(after_path, after.diagnostics))
@@ -184,10 +184,17 @@ fn assess_csv_inputs(
   if !error_text.is_empty() {
     return Err(error_text)
   }
-  let diff = @lib.compare_snapshots(before.records, after.records)
+  let diff = @lib.compare_snapshots(before.ipv4_records, after.ipv4_records)
+  let ipv6_diff = @lib.compare_ipv6_snapshots(
+    before.ipv6_records,
+    after.ipv6_records,
+  )
+  let has_ipv6 = !before.ipv6_records.is_empty() ||
+    !after.ipv6_records.is_empty() ||
+    !routes.ipv6_routes.is_empty()
   let previous = match
     apply_policy_source(
-      before.records.map(record => record.vrp),
+      before.ipv4_records.map(record => record.vrp),
       before_slurm_path,
       before_slurm_source,
     ) {
@@ -196,7 +203,7 @@ fn assess_csv_inputs(
   }
   let current = match
     apply_policy_source(
-      after.records.map(record => record.vrp),
+      after.ipv4_records.map(record => record.vrp),
       after_slurm_path,
       after_slurm_source,
     ) {
@@ -204,12 +211,20 @@ fn assess_csv_inputs(
     Err(message) => return Err(message)
   }
   let impact = @lib.assess_snapshot_impact(
-    routes.routes,
+    routes.ipv4_routes,
     previous.vrps,
     current.vrps,
   )
+  let ipv6_impact = @lib.assess_ipv6_snapshot_impact(
+    routes.ipv6_routes,
+    before.ipv6_records.map(record => record.vrp),
+    after.ipv6_records.map(record => record.vrp),
+  )
   let report = StringBuilder()
   report.write_string("VRP snapshot: \{diff.summary()}\n")
+  if has_ipv6 {
+    report.write_string("IPv6 VRP snapshot: \{ipv6_diff.summary()}\n")
+  }
   if previous.stats is Some(_) || current.stats is Some(_) {
     let before_status = match previous.stats {
       Some(stats) => stats.summary()
@@ -223,6 +238,9 @@ fn assess_csv_inputs(
     report.write_string("SLURM after: \{after_status}\n")
   }
   report.write_string("Route impact: \{impact.summary()}\n")
+  if has_ipv6 {
+    report.write_string("IPv6 route impact: \{ipv6_impact.summary()}\n")
+  }
   let mut newly_invalid = 0
   for change in impact.changed {
     if change.current.validity == @lib.Invalid {
@@ -232,13 +250,31 @@ fn assess_csv_inputs(
     report.write_string(change.explanation())
     report.write_string("\n")
   }
+  for change in ipv6_impact.changed {
+    if change.current.validity == @lib.Invalid {
+      newly_invalid = newly_invalid + 1
+      report.write_string("NEW INVALID: ")
+    }
+    report.write_string(change.explanation())
+    report.write_string("\n")
+  }
   report.write_string("Newly invalid routes: \{newly_invalid}\n")
-  let json = if previous.stats is Some(_) || current.stats is Some(_) {
+  let has_policy = previous.stats is Some(_) || current.stats is Some(_)
+  let json = if has_policy && has_ipv6 {
+    @lib.write_assessment_json(
+      diff,
+      impact,
+      slurm=(previous.stats, current.stats),
+      ipv6=(ipv6_diff, ipv6_impact),
+    )
+  } else if has_policy {
     @lib.write_assessment_json(
       diff,
       impact,
       slurm=(previous.stats, current.stats),
     )
+  } else if has_ipv6 {
+    @lib.write_assessment_json(diff, impact, ipv6=(ipv6_diff, ipv6_impact))
   } else {
     @lib.write_assessment_json(diff, impact)
   }

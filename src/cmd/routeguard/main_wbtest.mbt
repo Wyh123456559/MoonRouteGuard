@@ -187,3 +187,76 @@ test "preflight a SLURM rollout and rollback against unchanged VRPs" {
   assert_eq(rollback.text.contains("valid -> invalid"), true)
   assert_eq(rollback.json.contains("\"after\":null"), true)
 }
+
+///|
+test "assess mixed snapshots and count IPv6 risk in the gate" {
+  let before = "ASN,IP Prefix,Max Length,Trust Anchor\nAS64496,203.0.113.0/24,24,test\nAS64500,2001:db8::/32,48,test\n"
+  let after = "ASN,IP Prefix,Max Length,Trust Anchor\nAS64500,203.0.113.0/24,24,test\nAS64501,2001:db8::/32,48,test\n"
+  let routes = "ASN,IP Prefix\nAS64496,203.0.113.0/24\nAS64500,2001:db8:1::/48\n"
+  let report = assess_csv_inputs(
+    "old.csv",
+    before,
+    "new.csv",
+    after,
+    "routes.csv",
+    routes,
+    None,
+    None,
+    None,
+    None,
+  ).unwrap()
+  assert_eq(report.newly_invalid, 2)
+  assert_eq(report.text.contains("IPv6 VRP snapshot: +1 -1"), true)
+  assert_eq(report.text.contains("IPv6 route impact: 1 changed"), true)
+  assert_eq(
+    report.text.contains("AS64500 2001:db8:1::/48: valid -> invalid"),
+    true,
+  )
+  assert_eq(report.json.contains("\"ipv6Snapshot\":{\"added\":1"), true)
+  assert_eq(report.json.contains("\"ipv6RouteImpact\":{\"checked\":1"), true)
+  assert_eq(report.json.contains("\"prefix\":\"2001:db8:1::/48\""), true)
+}
+
+///|
+test "apply IPv4 SLURM without masking IPv6 risk" {
+  let before = "ASN,IP Prefix,Max Length,Trust Anchor\nAS64496,203.0.113.0/24,24,test\nAS64500,2001:db8::/32,48,test\n"
+  let after = "ASN,IP Prefix,Max Length,Trust Anchor\nAS64500,203.0.113.0/24,24,test\nAS64501,2001:db8::/32,48,test\n"
+  let routes = "ASN,IP Prefix\nAS64496,203.0.113.0/24\nAS64500,2001:db8:1::/48\n"
+  let policy = "{\"slurmVersion\":1,\"validationOutputFilters\":{\"prefixFilters\":[{\"asn\":64500}],\"bgpsecFilters\":[]},\"locallyAddedAssertions\":{\"prefixAssertions\":[{\"asn\":64496,\"prefix\":\"203.0.113.0/24\"}],\"bgpsecAssertions\":[]}}"
+  let report = assess_csv_inputs(
+    "old.csv",
+    before,
+    "new.csv",
+    after,
+    "routes.csv",
+    routes,
+    Some("policy.json"),
+    Some(policy),
+    Some("policy.json"),
+    Some(policy),
+  ).unwrap()
+  assert_eq(report.newly_invalid, 1)
+  assert_eq(report.text.contains("Route impact: 0 changed"), true)
+  assert_eq(report.text.contains("IPv6 route impact: 1 changed"), true)
+  assert_eq(report.json.contains("\"slurm\":{\"before\":"), true)
+}
+
+///|
+test "diagnose malformed IPv6 route rows with their input path" {
+  let snapshot = "ASN,IP Prefix,Max Length,Trust Anchor\n"
+  let routes = "ASN,IP Prefix\nAS64500,2001:db8::1/32\n"
+  let result = assess_csv_inputs(
+    "old.csv",
+    snapshot,
+    "new.csv",
+    snapshot,
+    "routes.csv",
+    routes,
+    None,
+    None,
+    None,
+    None,
+  )
+  guard result is Err(message) else { return }
+  assert_eq(message.contains("routes.csv:2:"), true)
+}

@@ -32,8 +32,8 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - IPv6 snapshot comparison and indexed route-impact analysis;
 - human-readable explanations for each route transition, including every
   covering VRP and ASN or prefix-length mismatch;
-- Node.js command-line assessment of three CSV files, with an optional failure
-  exit code for newly invalid routes;
+- dual-stack Node.js command-line assessment of three CSV files, with an
+  optional failure exit code for newly invalid routes;
 - RFC 8416 SLURM policy rollout and rollback simulation in the command-line
   assessment;
 - deterministic JSON assessment reports with exact added/removed VRP records,
@@ -79,6 +79,7 @@ Run the Node.js command-line example and checks:
 
 ```text
 moon run --target js src/cmd/routeguard -- examples/before.csv examples/after.csv examples/routes.csv
+moon run --target js src/cmd/routeguard -- --json examples/before-dual.csv examples/after-dual.csv examples/routes-dual.csv
 moon check --target wasm --deny-warn
 moon test --target wasm --deny-warn
 moon test --target js --deny-warn
@@ -87,7 +88,8 @@ moon test --target js --deny-warn
 The command prints the VRP snapshot difference and route validity transitions.
 For each changed route, it shows the covering VRPs before and after the change
 and whether each authorized the route or failed on origin ASN, maximum length,
-or both. Library users can call `RouteImpact::explanation()` for the same text.
+or both. Library users can call `RouteImpact::explanation()` or
+`Ipv6RouteImpact::explanation()` for the same text.
 To model the same local exception policy on both snapshots, add
 `--slurm examples/slurm.json` before the three CSV paths. The snapshot diff
 still describes the raw validator output; route impact uses the effective VRPs
@@ -98,15 +100,20 @@ policy rollout, replacement, or rollback. An omitted side uses the validator
 VRPs without local exceptions. The shared `--slurm` option cannot be combined
 with these side-specific options.
 Add `--json` before the paths for a machine-readable report with exact snapshot
-record changes, route transitions, and the covering VRPs behind each decision. The
-portable library also exposes `write_assessment_json(diff, impact)`.
+record changes, route transitions, and the covering VRPs behind each decision.
+When IPv6 rows are present, separate `ipv6Snapshot` and `ipv6RouteImpact`
+sections appear; the risk exit code counts both address families. The portable
+library also exposes `write_assessment_json(diff, impact)`.
 Pass `--fail-on-new-invalid` before the three paths to make a newly Invalid
 route fail the check. The generated Node.js process uses exit code 3 for that
 case and 2 for file or parse errors; `moon run` may normalize nonzero codes to
 1. For CI that needs the exact code, build with `moon build --target js` and run
 `node _build/js/debug/build/cmd/routeguard/routeguard.js` with the same arguments.
-The CLI currently supports IPv4 CSV input and requires Node.js; the library
-remains portable across Wasm, Wasm-GC, and JavaScript.
+The CLI reads mixed IPv4/IPv6 CSV input and requires Node.js; the library
+remains portable across Wasm, Wasm-GC, and JavaScript. SLURM policies currently
+affect IPv4 VRPs only; IPv6 routes are still evaluated against unmodified IPv6
+VRPs when a policy is supplied. CLI reports group IPv4 and IPv6 transitions by
+address family rather than preserving interleaved route-row order.
 Added and removed snapshot records include their trust-anchor labels. Covering
 VRPs inside route decisions do not yet carry source labels because the current
 validation decision model retains payloads but not their provenance.
@@ -132,13 +139,13 @@ snapshot while preserving trust-anchor labels and line-numbered diagnostics.
 The older `parse_vrp_csv` remains IPv4-only. Mixed route lists can be read with
 `parse_dual_stack_route_csv`; IPv6 snapshots can be compared with
 `compare_ipv6_snapshots` and assessed with `assess_ipv6_snapshot_impact`.
-SLURM and RPKI-RTR adapters currently accept IPv4 payloads only. IPv6 text with zone
-identifiers or embedded dotted IPv4 is not accepted by the prefix parser.
+SLURM and RPKI-RTR adapters currently accept IPv4 payloads only. IPv6 text with
+zone identifiers or embedded dotted IPv4 is not accepted by the prefix parser.
 
 The accepted four-column layout follows Routinator's documented
 [`csv` and `csvcompat` formats](https://routinator.docs.nlnetlabs.nl/en/stable/output-formats.html).
-The current parser reports IPv6 rows as unsupported instead of silently
-discarding them.
+The IPv4-only `parse_vrp_csv` reports IPv6 rows as unsupported instead of
+silently discarding them; use `parse_dual_stack_vrp_csv` for mixed input.
 
 Route announcements for batch validation can be loaded from a separate CSV:
 

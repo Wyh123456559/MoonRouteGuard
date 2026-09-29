@@ -53,3 +53,45 @@ test "retain ordered trust-anchor changes and escape labels" {
   assert_eq(output.contains("],\"removedRecords\":["), true)
   let _ = @json.parse(output)
 }
+
+///|
+test "serialize IPv6 VRP changes and route evidence beside IPv4 results" {
+  let prefix = Ipv6Prefix::parse("2001:db8::/32").unwrap()
+  let before_vrp = Ipv6Vrp::new(prefix, 48, 64496U).unwrap()
+  let after_vrp = Ipv6Vrp::new(prefix, 48, 64500U).unwrap()
+  let before_record : Ipv6VrpRecord = {
+    vrp: before_vrp,
+    trust_anchor: "before",
+  }
+  let after_record : Ipv6VrpRecord = { vrp: after_vrp, trust_anchor: "after", }
+  let ipv6_diff = compare_ipv6_snapshots([before_record], [after_record])
+  let route = Ipv6RouteAnnouncement::new(
+    Ipv6Prefix::parse("2001:db8:1::/48").unwrap(),
+    64496U,
+  )
+  let ipv6_impact = assess_ipv6_snapshot_impact([route], [before_vrp], [
+    after_vrp,
+  ])
+  let output = write_assessment_json(
+    compare_snapshots([], []),
+    assess_snapshot_impact([], [], []),
+    ipv6=(ipv6_diff, ipv6_impact),
+  )
+  assert_eq(
+    output.contains("\"ipv6Snapshot\":{\"added\":1,\"removed\":1"),
+    true,
+  )
+  assert_eq(output.contains("\"trustAnchor\":\"after\""), true)
+  assert_eq(output.contains("\"ipv6RouteImpact\":{\"checked\":1"), true)
+  assert_eq(output.contains("\"prefix\":\"2001:db8:1::/48\""), true)
+  assert_eq(output.contains("\"relation\":\"asnMismatch\""), true)
+  assert_eq(
+    write_assessment_json(
+      compare_snapshots([], []),
+      assess_snapshot_impact([], [], []),
+      ipv6=(ipv6_diff, ipv6_impact),
+    ),
+    output,
+  )
+  let _ = @json.parse(output)
+}
