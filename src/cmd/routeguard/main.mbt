@@ -42,20 +42,28 @@ struct CliConfig {
   after_path : String
   routes_path : String
   fail_on_new_invalid : Bool
+  json : Bool
 }
 
 ///|
 fn usage() -> String {
-  "usage: routeguard [--fail-on-new-invalid] BEFORE.csv AFTER.csv ROUTES.csv"
+  "usage: routeguard [--json] [--fail-on-new-invalid] BEFORE.csv AFTER.csv ROUTES.csv"
 }
 
 ///|
 fn parse_cli(argv : Array[String]) -> Result[CliConfig, String] {
   let mut start = 0
   let mut fail_on_new_invalid = false
-  if argv.length() > 0 && argv[0] == "--fail-on-new-invalid" {
-    start = 1
-    fail_on_new_invalid = true
+  let mut json = false
+  while start < argv.length() && argv[start].has_prefix("--") {
+    if argv[start] == "--fail-on-new-invalid" && !fail_on_new_invalid {
+      fail_on_new_invalid = true
+    } else if argv[start] == "--json" && !json {
+      json = true
+    } else {
+      return Err(usage())
+    }
+    start = start + 1
   }
   if argv.length() != start + 3 {
     return Err(usage())
@@ -70,6 +78,7 @@ fn parse_cli(argv : Array[String]) -> Result[CliConfig, String] {
     after_path: argv[start + 1],
     routes_path: argv[start + 2],
     fail_on_new_invalid,
+    json,
   })
 }
 
@@ -88,6 +97,7 @@ fn format_diagnostics(
 ///|
 struct CliReport {
   text : String
+  json : String
   newly_invalid : Int
 }
 
@@ -132,7 +142,11 @@ fn assess_csv_inputs(
     report.write_string("\n")
   }
   report.write_string("Newly invalid routes: \{newly_invalid}\n")
-  Ok({ text: report.to_string(), newly_invalid, })
+  Ok({
+    text: report.to_string(),
+    json: @lib.write_assessment_json(diff, impact),
+    newly_invalid,
+  })
 }
 
 ///|
@@ -194,7 +208,11 @@ fn main {
       routes,
     ) {
     Ok(report) => {
-      node_write_output(report.text)
+      if config.json {
+        node_write_output("\{report.json}\n")
+      } else {
+        node_write_output(report.text)
+      }
       if config.fail_on_new_invalid && report.newly_invalid > 0 {
         node_set_exit_code(3)
       }

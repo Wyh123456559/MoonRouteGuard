@@ -29,6 +29,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - route-impact analysis across VRP snapshots with old and new evidence;
 - Node.js command-line assessment of three CSV files, with an optional failure
   exit code for newly invalid routes;
+- deterministic JSON assessment reports with old and new covering VRP evidence;
 - RFC 8416 IPv4 prefix filters and locally added assertions;
 - strict RFC 8416 JSON parsing with atomic configuration rejection;
 - deterministic RFC 8416 JSON output with parse/write round-trip safety;
@@ -76,6 +77,9 @@ moon test --target js --deny-warn
 ```
 
 The command prints the VRP snapshot difference and route validity transitions.
+Add `--json` before the paths for a machine-readable report with snapshot
+counts, route transitions, and the covering VRPs behind each decision. The
+portable library also exposes `write_assessment_json(diff, impact)`.
 Pass `--fail-on-new-invalid` before the three paths to make a newly Invalid
 route fail the check. The generated Node.js process uses exit code 3 for that
 case and 2 for file or parse errors; `moon run` may normalize nonzero codes to
@@ -83,6 +87,8 @@ case and 2 for file or parse errors; `moon run` may normalize nonzero codes to
 `node _build/js/debug/build/cmd/routeguard/routeguard.js` with the same arguments.
 The CLI currently supports IPv4 CSV input and requires Node.js; the library
 remains portable across Wasm, Wasm-GC, and JavaScript.
+The JSON report does not include trust-anchor labels because the current
+validation decision model retains VRP payloads but not their source labels.
 
 IPv6 route origin validation uses the same validity states and evidence
 relations. Its prefix parser accepts compressed hexadecimal addresses and

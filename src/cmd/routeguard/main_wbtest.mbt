@@ -2,14 +2,25 @@
 test "parse command options and file paths" {
   let plain = parse_cli(["old.csv", "new.csv", "routes.csv"]).unwrap()
   assert_eq(plain.fail_on_new_invalid, false)
+  assert_eq(plain.json, false)
   assert_eq(plain.routes_path, "routes.csv")
   let gated = parse_cli([
     "--fail-on-new-invalid", "old.csv", "new.csv", "routes.csv",
   ]).unwrap()
   assert_eq(gated.fail_on_new_invalid, true)
   assert_eq(gated.before_path, "old.csv")
+  let machine = parse_cli([
+    "--fail-on-new-invalid", "--json", "old.csv", "new.csv", "routes.csv",
+  ]).unwrap()
+  assert_eq(machine.json, true)
+  assert_eq(machine.fail_on_new_invalid, true)
   assert_eq(parse_cli([]) is Err(_), true)
   assert_eq(parse_cli(["--unknown", "new.csv", "routes.csv"]) is Err(_), true)
+  assert_eq(
+    parse_cli(["--json", "--json", "old.csv", "new.csv", "routes.csv"])
+    is Err(_),
+    true,
+  )
 }
 
 ///|
@@ -29,6 +40,8 @@ test "assess CSV snapshots against actual route rows" {
     true,
   )
   assert_eq(report.text.contains("1 unchanged"), true)
+  assert_eq(report.json.contains("\"newlyInvalid\":1"), true)
+  assert_eq(report.json.contains("\"relation\":\"asnMismatch\""), true)
 }
 
 ///|
