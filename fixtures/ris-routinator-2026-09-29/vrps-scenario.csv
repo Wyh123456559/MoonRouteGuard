@@ -1,0 +1,3 @@
+ASN,IP Prefix,Max Length,Trust Anchor
+AS64500,193.0.0.0/21,21,test
+AS64500,2001:67c:2e8::/48,48,test

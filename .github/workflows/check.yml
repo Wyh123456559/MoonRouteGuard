@@ -19,6 +19,10 @@ jobs:
       - uses: hustcer/setup-moonbit@v1
       - run: moon check --target ${{ matrix.target }} --deny-warn
       - run: moon test --target ${{ matrix.target }} --deny-warn
+      - if: matrix.target == 'js'
+        run: |
+          moon build --target js
+          node scripts/verify-real-fixture.mjs
 
   formatting:
     runs-on: ubuntu-latest

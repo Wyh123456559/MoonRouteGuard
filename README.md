@@ -85,6 +85,13 @@ moon test --target wasm --deny-warn
 moon test --target js --deny-warn
 ```
 
+For a source-attributed interoperability check using observed BGP routes and
+Routinator VRPs, run `moon build --target js` followed by
+`node scripts/verify-real-fixture.mjs`. The
+[real-source fixture](fixtures/ris-routinator-2026-09-29/README.md) records the
+capture time, original snapshot checksum, RIPE RIS observations, Routinator
+reference results, and the separate hypothetical change used for risk testing.
+
 The command prints the VRP snapshot difference and route validity transitions.
 For each changed route, it shows the covering VRPs before and after the change
 and whether each authorized the route or failed on origin ASN, maximum length,
@@ -259,10 +266,9 @@ the protocol's requirement to ignore reserved fields on receipt.
 
 ## Next steps
 
-Planned work includes IPv6 support in the CSV, SLURM, snapshot comparison, and
-RPKI-RTR adapters, BGPsec SLURM rules, Router Key and Error Report PDUs, and an
-RPKI-RTR session state machine. These capabilities are not part of the current
-release.
+Planned work includes IPv6 support in SLURM and RPKI-RTR adapters, BGPsec
+SLURM rules, Router Key and Error Report PDUs, and an RPKI-RTR session state
+machine. These capabilities are not part of the current release.
 
 ## License
 

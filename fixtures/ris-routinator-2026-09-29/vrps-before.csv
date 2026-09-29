@@ -1,0 +1,6 @@
+ASN,IP Prefix,Max Length,Trust Anchor
+AS13335,1.0.0.0/24,24,apnic
+AS0,185.49.142.0/24,24,ripe
+AS211321,185.49.142.0/23,23,ripe
+AS3333,193.0.0.0/21,21,ripe
+AS3333,2001:67c:2e8::/48,48,ripe

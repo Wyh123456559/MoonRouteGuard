@@ -1,0 +1,41 @@
+{
+  "routes": [
+    {
+      "asn": 13335,
+      "prefix": "1.0.0.0/24",
+      "beforeStatus": "valid",
+      "afterStatus": "not found",
+      "beforeCovering": [
+        { "asn": 13335, "prefix": "1.0.0.0/24", "maxLength": 24, "relation": "authorizes" }
+      ]
+    },
+    {
+      "asn": 211321,
+      "prefix": "185.49.142.0/24",
+      "beforeStatus": "invalid",
+      "afterStatus": "not found",
+      "beforeCovering": [
+        { "asn": 0, "prefix": "185.49.142.0/24", "maxLength": 24, "relation": "asnMismatch" },
+        { "asn": 211321, "prefix": "185.49.142.0/23", "maxLength": 23, "relation": "lengthExceeded" }
+      ]
+    },
+    {
+      "asn": 3333,
+      "prefix": "193.0.0.0/21",
+      "beforeStatus": "valid",
+      "afterStatus": "invalid",
+      "beforeCovering": [
+        { "asn": 3333, "prefix": "193.0.0.0/21", "maxLength": 21, "relation": "authorizes" }
+      ]
+    },
+    {
+      "asn": 3333,
+      "prefix": "2001:67c:2e8::/48",
+      "beforeStatus": "valid",
+      "afterStatus": "invalid",
+      "beforeCovering": [
+        { "asn": 3333, "prefix": "2001:67c:2e8::/48", "maxLength": 48, "relation": "authorizes" }
+      ]
+    }
+  ]
+}
