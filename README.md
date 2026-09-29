@@ -27,6 +27,8 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - indexed validation with at most 33 prefix-key lookups per IPv4 route;
 - IPv6 VRP validation and an index with at most 129 prefix-key lookups per route;
 - route-impact analysis across VRP snapshots with old and new evidence;
+- human-readable explanations for each route transition, including every
+  covering VRP and ASN or prefix-length mismatch;
 - Node.js command-line assessment of three CSV files, with an optional failure
   exit code for newly invalid routes;
 - RFC 8416 SLURM policy rollout and rollback simulation in the command-line
@@ -80,6 +82,9 @@ moon test --target js --deny-warn
 ```
 
 The command prints the VRP snapshot difference and route validity transitions.
+For each changed route, it shows the covering VRPs before and after the change
+and whether each authorized the route or failed on origin ASN, maximum length,
+or both. Library users can call `RouteImpact::explanation()` for the same text.
 To model the same local exception policy on both snapshots, add
 `--slurm examples/slurm.json` before the three CSV paths. The snapshot diff
 still describes the raw validator output; route impact uses the effective VRPs

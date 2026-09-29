@@ -74,6 +74,9 @@ test "assess CSV snapshots against actual route rows" {
     true,
   )
   assert_eq(report.text.contains("1 unchanged"), true)
+  assert_eq(report.text.contains("before (valid):"), true)
+  assert_eq(report.text.contains("after (invalid):"), true)
+  assert_eq(report.text.contains("origin ASN mismatch"), true)
   assert_eq(report.json.contains("\"newlyInvalid\":1"), true)
   assert_eq(report.json.contains("\"relation\":\"asnMismatch\""), true)
   assert_eq(report.json.contains("\"trustAnchor\":\"arin\""), true)

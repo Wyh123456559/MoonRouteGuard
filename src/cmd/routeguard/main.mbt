@@ -229,7 +229,7 @@ fn assess_csv_inputs(
       newly_invalid = newly_invalid + 1
       report.write_string("NEW INVALID: ")
     }
-    report.write_string(change.summary())
+    report.write_string(change.explanation())
     report.write_string("\n")
   }
   report.write_string("Newly invalid routes: \{newly_invalid}\n")

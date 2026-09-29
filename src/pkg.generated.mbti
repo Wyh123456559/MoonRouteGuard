@@ -153,6 +153,7 @@ pub(all) struct RouteImpact {
   current : ValidationDecision
 } derive(Eq, @debug.Debug)
 pub fn RouteImpact::equal(Self, Self) -> Bool
+pub fn RouteImpact::explanation(Self) -> String
 pub fn RouteImpact::not_equal(Self, Self) -> Bool
 pub fn RouteImpact::summary(Self) -> String
 pub fn RouteImpact::to_repr(Self) -> @debug.Repr

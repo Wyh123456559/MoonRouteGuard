@@ -21,6 +21,50 @@ pub fn RouteImpact::summary(self : RouteImpact) -> String {
 }
 
 ///|
+fn human_relation_label(relation : VrpRelation) -> String {
+  match relation {
+    Authorizes => "authorizes"
+    AsnMismatch => "origin ASN mismatch"
+    LengthExceeded => "route prefix length exceeds maxLength"
+    AsnAndLengthMismatch => "origin ASN and prefix length mismatch"
+  }
+}
+
+///|
+fn write_decision_evidence(
+  buffer : StringBuilder,
+  label : String,
+  decision : ValidationDecision,
+) -> Unit {
+  buffer.write_string("  \{label} (\{validity_label(decision.validity)}):")
+  if decision.matches.is_empty() {
+    buffer.write_string("\n    no covering VRP")
+  } else {
+    for evidence in decision.matches {
+      let vrp = evidence.vrp
+      buffer.write_string(
+        "\n    AS\{vrp.asn()} \{vrp.prefix().to_string()} maxLength \{vrp.max_length()}: \{human_relation_label(evidence.relation)}",
+      )
+    }
+  }
+}
+
+///|
+/// Explain a route-state transition using all old and new covering VRPs.
+///
+/// Evidence remains in validator order. An empty side is stated explicitly so
+/// a NotFound decision cannot be mistaken for a missing report section.
+pub fn RouteImpact::explanation(self : RouteImpact) -> String {
+  let buffer = StringBuilder()
+  buffer.write_string(self.summary())
+  buffer.write_char('\n')
+  write_decision_evidence(buffer, "before", self.previous)
+  buffer.write_char('\n')
+  write_decision_evidence(buffer, "after", self.current)
+  buffer.to_string()
+}
+
+///|
 /// Route-validation changes caused by replacing one complete VRP snapshot.
 pub(all) struct SnapshotImpact {
   changed : Array[RouteImpact]

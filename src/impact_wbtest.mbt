@@ -72,3 +72,31 @@ test "empty route sets have no impact" {
   assert_eq(impact.is_empty(), true)
   assert_eq(impact.unchanged, 0)
 }
+
+///|
+test "explain every mismatch behind a newly invalid route" {
+  let route = RouteAnnouncement::new(impact_prefix("203.0.113.0/25"), 64496U)
+  let previous = [impact_vrp("203.0.113.0/24", 25, 64496U)]
+  let current = [
+    impact_vrp("203.0.113.0/24", 25, 64500U),
+    impact_vrp("203.0.113.0/24", 24, 64496U),
+    impact_vrp("203.0.113.0/24", 24, 64500U),
+  ]
+  let change = assess_snapshot_impact([route], previous, current).changed[0]
+  inspect(
+    change.explanation(),
+    content="AS64496 203.0.113.0/25: valid -> invalid\n  before (valid):\n    AS64496 203.0.113.0/24 maxLength 25: authorizes\n  after (invalid):\n    AS64500 203.0.113.0/24 maxLength 25: origin ASN mismatch\n    AS64496 203.0.113.0/24 maxLength 24: route prefix length exceeds maxLength\n    AS64500 203.0.113.0/24 maxLength 24: origin ASN and prefix length mismatch",
+  )
+}
+
+///|
+test "explain a missing old covering VRP explicitly" {
+  let route = RouteAnnouncement::new(impact_prefix("192.0.2.0/24"), 64496U)
+  let current = [impact_vrp("192.0.2.0/24", 24, 64496U)]
+  let change = assess_snapshot_impact([route], [], current).changed[0]
+  assert_eq(
+    change.explanation().contains("before (not found):\n    no covering VRP"),
+    true,
+  )
+  assert_eq(change.explanation().contains("after (valid):"), true)
+}
