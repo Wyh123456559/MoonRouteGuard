@@ -8,7 +8,11 @@ import {
 // Values
 pub fn apply_slurm(Array[Vrp], Array[SlurmPrefixFilter], Array[Vrp]) -> SlurmApplyResult
 
+pub fn assess_ipv6_snapshot_impact(Array[Ipv6RouteAnnouncement], Array[Ipv6Vrp], Array[Ipv6Vrp]) -> Ipv6SnapshotImpact
+
 pub fn assess_snapshot_impact(Array[RouteAnnouncement], Array[Vrp], Array[Vrp]) -> SnapshotImpact
+
+pub fn compare_ipv6_snapshots(Array[Ipv6VrpRecord], Array[Ipv6VrpRecord]) -> Ipv6SnapshotDiff
 
 pub fn compare_snapshots(Array[VrpRecord], Array[VrpRecord]) -> SnapshotDiff
 
@@ -17,6 +21,8 @@ pub fn decode_rtr_pdu(Bytes) -> Result[RtrPdu, String]
 pub fn decode_rtr_pdus(Bytes) -> Result[Array[RtrPdu], String]
 
 pub fn encode_rtr_pdu(RtrPdu) -> Result[Bytes, String]
+
+pub fn parse_dual_stack_route_csv(StringView) -> DualStackRouteCsvResult
 
 pub fn parse_dual_stack_vrp_csv(StringView) -> DualStackVrpCsvResult
 
@@ -52,6 +58,13 @@ pub(all) struct CsvDiagnostic {
 pub fn CsvDiagnostic::equal(Self, Self) -> Bool
 pub fn CsvDiagnostic::not_equal(Self, Self) -> Bool
 pub fn CsvDiagnostic::to_repr(Self) -> @debug.Repr
+
+pub(all) struct DualStackRouteCsvResult {
+  ipv4_routes : Array[RouteAnnouncement]
+  ipv6_routes : Array[Ipv6RouteAnnouncement]
+  diagnostics : Array[CsvDiagnostic]
+}
+pub fn DualStackRouteCsvResult::is_valid(Self) -> Bool
 
 pub(all) struct DualStackVrpCsvResult {
   ipv4_records : Array[VrpRecord]
@@ -100,6 +113,28 @@ pub fn Ipv6RouteAnnouncement::origin_asn(Self) -> UInt
 pub fn Ipv6RouteAnnouncement::prefix(Self) -> Ipv6Prefix
 pub fn Ipv6RouteAnnouncement::to_repr(Self) -> @debug.Repr
 
+pub(all) struct Ipv6RouteImpact {
+  previous : Ipv6ValidationDecision
+  current : Ipv6ValidationDecision
+}
+pub fn Ipv6RouteImpact::explanation(Self) -> String
+pub fn Ipv6RouteImpact::summary(Self) -> String
+
+pub(all) struct Ipv6SnapshotDiff {
+  added : Array[Ipv6VrpRecord]
+  removed : Array[Ipv6VrpRecord]
+  unchanged : Int
+}
+pub fn Ipv6SnapshotDiff::is_empty(Self) -> Bool
+pub fn Ipv6SnapshotDiff::summary(Self) -> String
+
+pub(all) struct Ipv6SnapshotImpact {
+  changed : Array[Ipv6RouteImpact]
+  unchanged : Int
+}
+pub fn Ipv6SnapshotImpact::is_empty(Self) -> Bool
+pub fn Ipv6SnapshotImpact::summary(Self) -> String
+
 pub(all) struct Ipv6ValidationDecision {
   route : Ipv6RouteAnnouncement
   validity : RouteValidity
@@ -144,6 +179,12 @@ pub(all) struct Ipv6VrpRecord {
   vrp : Ipv6Vrp
   trust_anchor : String
 }
+
+type Ipv6VrpRecordKey derive(Eq, Hash)
+pub fn Ipv6VrpRecordKey::equal(Self, Self) -> Bool
+pub fn Ipv6VrpRecordKey::hash(Self) -> Int
+pub fn Ipv6VrpRecordKey::hash_combine(Self, Hasher) -> Unit
+pub fn Ipv6VrpRecordKey::not_equal(Self, Self) -> Bool
 
 pub struct RouteAnnouncement {
   prefix : Ipv4Prefix

@@ -20,6 +20,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - Routinator `csv` and quoted `csvcompat` VRP input with trust-anchor labels;
 - mixed IPv4/IPv6 Routinator CSV parsing through a separate dual-stack API;
 - two-column IPv4 route CSV input with line-numbered diagnostics;
+- mixed IPv4/IPv6 route CSV parsing for batch assessment;
 - deterministic Routinator `csv` and `csvcompat` output with round-trip safety;
 - recoverable, line-numbered diagnostics for malformed or unsupported rows;
 - set-based comparison of complete VRP snapshots, including trust-anchor
@@ -28,6 +29,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - indexed validation with at most 33 prefix-key lookups per IPv4 route;
 - IPv6 VRP validation and an index with at most 129 prefix-key lookups per route;
 - route-impact analysis across VRP snapshots with old and new evidence;
+- IPv6 snapshot comparison and indexed route-impact analysis;
 - human-readable explanations for each route transition, including every
   covering VRP and ASN or prefix-length mismatch;
 - Node.js command-line assessment of three CSV files, with an optional failure
@@ -127,8 +129,10 @@ println(index.validate(route).summary())
 The IPv6 core is available through its own types and validation functions.
 `parse_dual_stack_vrp_csv` reads both address families from a single Routinator
 snapshot while preserving trust-anchor labels and line-numbered diagnostics.
-The older `parse_vrp_csv` remains IPv4-only. SLURM, snapshot comparison, and
-RPKI-RTR adapters currently accept IPv4 payloads only. IPv6 text with zone
+The older `parse_vrp_csv` remains IPv4-only. Mixed route lists can be read with
+`parse_dual_stack_route_csv`; IPv6 snapshots can be compared with
+`compare_ipv6_snapshots` and assessed with `assess_ipv6_snapshot_impact`.
+SLURM and RPKI-RTR adapters currently accept IPv4 payloads only. IPv6 text with zone
 identifiers or embedded dotted IPv4 is not accepted by the prefix parser.
 
 The accepted four-column layout follows Routinator's documented
