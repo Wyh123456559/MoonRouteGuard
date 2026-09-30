@@ -43,6 +43,15 @@ test "reject invalid IPv6 address forms and host bits" {
 }
 
 ///|
+test "reject noncanonical IPv6 prefix length spellings" {
+  for text in ["2001:db8::/032", "2001:db8::/+32", "2001:db8::/0x20"] {
+    if Ipv6Prefix::parse(text) is Ok(_) {
+      fail("accepted noncanonical IPv6 prefix: \{text}")
+    }
+  }
+}
+
+///|
 test "IPv6 containment crosses 32-bit word boundaries" {
   assert_true(v6_prefix("::/0").covers(v6_prefix("ffff::/16")))
   assert_true(v6_prefix("2001:db8::/33").covers(v6_prefix("2001:db8:800::/48")))

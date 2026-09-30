@@ -24,6 +24,18 @@ test "parse canonical IPv4 prefixes and reject host bits" {
 }
 
 ///|
+test "reject noncanonical decimal spellings in IPv4 prefixes" {
+  for
+    text in [
+      "203.0.0113.0/24", "203.0.113.0/024", "203.0.113.0/+24", "203.0.113.0/0x18",
+    ] {
+    if Ipv4Prefix::parse(text) is Ok(_) {
+      fail("accepted noncanonical IPv4 prefix: \{text}")
+    }
+  }
+}
+
+///|
 test "validate exact and authorized more-specific routes" {
   let payload = vrp("203.0.113.0/24", 26, 64496U)
   let exact = RouteAnnouncement::new(prefix("203.0.113.0/24"), 64496U)

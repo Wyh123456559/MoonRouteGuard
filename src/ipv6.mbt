@@ -70,6 +70,7 @@ fn ipv6_prefix_from_groups(groups : Array[Int], length : Int) -> Ipv6Prefix {
 ///|
 /// Parse an IPv6 CIDR prefix, accepting compressed hexadecimal notation.
 /// Host bits must be zero; zone identifiers and embedded IPv4 are not accepted.
+/// The decimal prefix length must not have a sign or leading zeroes.
 pub fn Ipv6Prefix::parse(text : StringView) -> Result[Ipv6Prefix, String] {
   let input = text.trim()
   let parts : Array[StringView] = []
@@ -79,7 +80,7 @@ pub fn Ipv6Prefix::parse(text : StringView) -> Result[Ipv6Prefix, String] {
   if parts.length() != 2 {
     return Err("IPv6 prefix must have address/length form: \{input}")
   }
-  let length = match parse_int_part(parts[1], "prefix length") {
+  let length = match parse_canonical_decimal_part(parts[1], "prefix length") {
     Ok(value) => value
     Err(message) => return Err(message)
   }

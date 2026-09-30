@@ -22,6 +22,22 @@ fn parse_int_part(text : StringView, label : String) -> Result[Int, String] {
 }
 
 ///|
+fn parse_canonical_decimal_part(
+  text : StringView,
+  label : String,
+) -> Result[Int, String] {
+  if text.is_empty() || (text.length() > 1 && text[0] == '0') {
+    return Err("invalid \{label}: \{text}")
+  }
+  for ch in text {
+    if ch < '0' || ch > '9' {
+      return Err("invalid \{label}: \{text}")
+    }
+  }
+  parse_int_part(text, label)
+}
+
+///|
 fn parse_ipv4_address(text : StringView) -> Result[UInt, String] {
   let parts : Array[StringView] = []
   for part in text.split(".") {
@@ -32,7 +48,7 @@ fn parse_ipv4_address(text : StringView) -> Result[UInt, String] {
   }
   let mut value = 0U
   for part in parts {
-    let octet = match parse_int_part(part, "IPv4 octet") {
+    let octet = match parse_canonical_decimal_part(part, "IPv4 octet") {
       Ok(value) => value
       Err(message) => return Err(message)
     }
@@ -46,6 +62,7 @@ fn parse_ipv4_address(text : StringView) -> Result[UInt, String] {
 
 ///|
 /// Parse a canonical IPv4 CIDR prefix such as `203.0.113.0/24`.
+/// Decimal octets and prefix lengths must not have signs or leading zeroes.
 pub fn Ipv4Prefix::parse(text : StringView) -> Result[Ipv4Prefix, String] {
   let input = text.trim()
   let parts : Array[StringView] = []
@@ -59,7 +76,7 @@ pub fn Ipv4Prefix::parse(text : StringView) -> Result[Ipv4Prefix, String] {
     Ok(value) => value
     Err(message) => return Err(message)
   }
-  let length = match parse_int_part(parts[1], "prefix length") {
+  let length = match parse_canonical_decimal_part(parts[1], "prefix length") {
     Ok(value) => value
     Err(message) => return Err(message)
   }
