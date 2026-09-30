@@ -21,8 +21,9 @@ moon run --target js src/cmd/routeguard -- examples/before.csv examples/after.cs
 ```
 
 The library package is portable; Node.js is only needed for the file-reading
-command-line program. This repository has not yet been published to Mooncakes,
-so use the source checkout until a package release is available.
+command-line program. The module is available on Mooncakes as
+`Wyh123456559/moonrouteguard`; use `moon add Wyh123456559/moonrouteguard` to
+add it to another MoonBit project.
 
 ## What works
 
