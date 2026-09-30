@@ -81,3 +81,22 @@ test "index owns its VRP snapshot" {
   assert_eq(index.length(), 1)
   assert_eq(index.validate(route).validity, Valid)
 }
+
+///|
+test "indexed IPv4 decisions agree with linear validation at every prefix length" {
+  let host = index_prefix("203.0.113.7/32")
+  let route = RouteAnnouncement::new(host, 64500U)
+  let vrps : Array[Vrp] = []
+  for length in 0..<=32 {
+    let parent : Ipv4Prefix = {
+      address: host.address & prefix_mask(length),
+      length,
+    }
+    let max_length = if length % 2 == 0 { 32 } else { length }
+    let asn = if length % 3 == 0 { 64500U } else { 64501U }
+    vrps.push(Vrp::new(parent, max_length, asn).unwrap())
+  }
+  let indexed = VrpIndex::new(vrps).validate(route)
+  assert_eq(indexed, validate_route(route, vrps))
+  assert_eq(indexed.matches.length(), 33)
+}

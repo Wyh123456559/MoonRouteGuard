@@ -114,6 +114,32 @@ test "round trip every supported RPKI-RTR PDU" {
 }
 
 ///|
+test "round trip IPv4 and IPv6 RTR payloads at every prefix length" {
+  let ipv4_host = Ipv4Prefix::parse("203.0.113.7/32").unwrap()
+  for length in 0..<=32 {
+    let prefix : Ipv4Prefix = {
+      address: ipv4_host.address & prefix_mask(length),
+      length,
+    }
+    let pdu = Ipv4PrefixPdu(
+      length % 2 == 0,
+      Vrp::new(prefix, 32, 64500U).unwrap(),
+    )
+    assert_eq(decode_rtr_pdu(encode_rtr_pdu(pdu).unwrap()).unwrap(), pdu)
+  }
+  let ipv6_host = Ipv6Prefix::parse(
+    "2001:db8:1234:5678:9abc:def0:1234:5678/128",
+  ).unwrap()
+  for length in 0..<=128 {
+    let pdu = Ipv6PrefixPdu(
+      length % 2 == 0,
+      Ipv6Vrp::new(ipv6_host.masked(length), 128, 64500U).unwrap(),
+    )
+    assert_eq(decode_rtr_pdu(encode_rtr_pdu(pdu).unwrap()).unwrap(), pdu)
+  }
+}
+
+///|
 test "decode consecutive RPKI-RTR PDUs" {
   let bytes = encode_rtr_pdu(CacheResponse(7)).unwrap() +
     encode_rtr_pdu(Ipv4PrefixPdu(true, rtr_test_vrp())).unwrap() +

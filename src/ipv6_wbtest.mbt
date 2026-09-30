@@ -126,3 +126,19 @@ test "indexed IPv6 validation matches linear results and owns its snapshot" {
   assert_eq(index.validate(routes[0]).validity, Valid)
   assert_eq(Ipv6VrpIndex::new([]).validate(routes[0]).validity, NotFound)
 }
+
+///|
+test "indexed IPv6 decisions agree with linear validation at every prefix length" {
+  let host = v6_prefix("2001:db8:1234:5678:9abc:def0:1234:5678/128")
+  let route = Ipv6RouteAnnouncement::new(host, 64500U)
+  let vrps : Array[Ipv6Vrp] = []
+  for length in 0..<=128 {
+    let parent = host.masked(length)
+    let max_length = if length % 2 == 0 { 128 } else { length }
+    let asn = if length % 3 == 0 { 64500U } else { 64501U }
+    vrps.push(Ipv6Vrp::new(parent, max_length, asn).unwrap())
+  }
+  let indexed = Ipv6VrpIndex::new(vrps).validate(route)
+  assert_eq(indexed, validate_ipv6_route(route, vrps))
+  assert_eq(indexed.matches.length(), 129)
+}
