@@ -9,6 +9,11 @@ fn rtr_test_vrp() -> Vrp {
 }
 
 ///|
+fn rtr_test_ipv6_vrp() -> Ipv6Vrp {
+  Ipv6Vrp::new(Ipv6Prefix::parse("2001:db8::/32").unwrap(), 48, 64496U).unwrap()
+}
+
+///|
 test "encode RFC 8210 control PDUs byte for byte" {
   assert_eq(
     encode_rtr_pdu(SerialNotify(0x1234, 0x01020304U)).unwrap(),
@@ -65,6 +70,19 @@ test "encode IPv4 prefix and End of Data PDUs" {
 }
 
 ///|
+test "encode IPv6 prefix PDU byte for byte" {
+  assert_eq(
+    encode_rtr_pdu(Ipv6PrefixPdu(true, rtr_test_ipv6_vrp())).unwrap(),
+    rtr_bytes([
+      b'\x01', b'\x06', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x20', b'\x01',
+      b'\x20', b'\x30', b'\x00', b'\x20', b'\x01', b'\x0d', b'\xb8', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\xfb', b'\xf0',
+    ]),
+  )
+}
+
+///|
 test "round trip every supported RPKI-RTR PDU" {
   let pdus = [
     SerialNotify(1, 2U),
@@ -73,6 +91,20 @@ test "round trip every supported RPKI-RTR PDU" {
     CacheResponse(42),
     Ipv4PrefixPdu(true, rtr_test_vrp()),
     Ipv4PrefixPdu(false, rtr_test_vrp()),
+    Ipv6PrefixPdu(true, rtr_test_ipv6_vrp()),
+    Ipv6PrefixPdu(false, rtr_test_ipv6_vrp()),
+    Ipv6PrefixPdu(
+      true,
+      Ipv6Vrp::new(Ipv6Prefix::parse("::/0").unwrap(), 128, 0U).unwrap(),
+    ),
+    Ipv6PrefixPdu(
+      false,
+      Ipv6Vrp::new(
+        Ipv6Prefix::parse("2001:db8::1/128").unwrap(),
+        128,
+        4294967295U,
+      ).unwrap(),
+    ),
     EndOfData(42, 9U, 1U, 1U, 600U),
     CacheReset,
   ]
@@ -85,12 +117,14 @@ test "round trip every supported RPKI-RTR PDU" {
 test "decode consecutive RPKI-RTR PDUs" {
   let bytes = encode_rtr_pdu(CacheResponse(7)).unwrap() +
     encode_rtr_pdu(Ipv4PrefixPdu(true, rtr_test_vrp())).unwrap() +
+    encode_rtr_pdu(Ipv6PrefixPdu(true, rtr_test_ipv6_vrp())).unwrap() +
     encode_rtr_pdu(EndOfData(7, 12U, 3600U, 600U, 7200U)).unwrap()
   let decoded = decode_rtr_pdus(bytes).unwrap()
-  assert_eq(decoded.length(), 3)
+  assert_eq(decoded.length(), 4)
   assert_eq(decoded[0], CacheResponse(7))
   assert_eq(decoded[1], Ipv4PrefixPdu(true, rtr_test_vrp()))
-  assert_eq(decoded[2], EndOfData(7, 12U, 3600U, 600U, 7200U))
+  assert_eq(decoded[2], Ipv6PrefixPdu(true, rtr_test_ipv6_vrp()))
+  assert_eq(decoded[3], EndOfData(7, 12U, 3600U, 600U, 7200U))
 }
 
 ///|
@@ -136,28 +170,55 @@ test "reject malformed RPKI-RTR framing" {
 
 ///|
 test "reject malformed IPv4 prefix PDUs" {
-  let invalid_flags = [
+  let prefix = [
     b'\x01', b'\x04', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x14', b'\x02',
     b'\x18', b'\x18', b'\x00', b'\xcb', b'\x00', b'\x71', b'\x00', b'\x00', b'\x00',
     b'\xfb', b'\xf0',
   ]
-  assert_eq(
-    decode_rtr_pdu(rtr_bytes(invalid_flags)).unwrap_err(),
-    "RPKI-RTR IPv4 prefix flags must be 0 or 1",
-  )
-  let host_bits = invalid_flags.copy()
+  let host_bits = prefix.copy()
   host_bits[8] = b'\x01'
   host_bits[15] = b'\x01'
   assert_eq(
     decode_rtr_pdu(rtr_bytes(host_bits)).unwrap_err(),
     "RPKI-RTR IPv4 prefix has host bits set",
   )
-  let bad_max_length = invalid_flags.copy()
+  let bad_max_length = prefix.copy()
   bad_max_length[8] = b'\x01'
   bad_max_length[10] = b'\x17'
   assert_eq(
     decode_rtr_pdu(rtr_bytes(bad_max_length)).unwrap_err(),
     "invalid RPKI-RTR IPv4 prefix PDU: VRP maximum length must be between the prefix length and 32",
+  )
+}
+
+///|
+test "reject malformed IPv6 prefix PDUs" {
+  let prefix = encode_rtr_pdu(Ipv6PrefixPdu(true, rtr_test_ipv6_vrp()))
+    .unwrap()
+    .to_array()
+  let bad_length = prefix.copy()
+  bad_length[7] = b'\x1f'
+  assert_eq(
+    decode_rtr_pdu(rtr_bytes(bad_length)).unwrap_err(),
+    "RPKI-RTR PDU length must be 32, got 31",
+  )
+  let bad_prefix_length = prefix.copy()
+  bad_prefix_length[9] = b'\x81'
+  assert_eq(
+    decode_rtr_pdu(rtr_bytes(bad_prefix_length)).unwrap_err(),
+    "RPKI-RTR IPv6 prefix length must be between 0 and 128",
+  )
+  let bad_max_length = prefix.copy()
+  bad_max_length[10] = b'\x1f'
+  assert_eq(
+    decode_rtr_pdu(rtr_bytes(bad_max_length)).unwrap_err(),
+    "invalid RPKI-RTR IPv6 prefix PDU: IPv6 VRP maximum length must be between the prefix length and 128",
+  )
+  let host_bits = prefix.copy()
+  host_bits[27] = b'\x01'
+  assert_eq(
+    decode_rtr_pdu(rtr_bytes(host_bits)).unwrap_err(),
+    "RPKI-RTR IPv6 prefix has host bits set",
   )
 }
 
@@ -191,5 +252,24 @@ test "ignore reserved zero fields on receipt as required by RFC 8210" {
   assert_eq(
     decode_rtr_pdu(rtr_bytes(prefix)).unwrap(),
     Ipv4PrefixPdu(true, rtr_test_vrp()),
+  )
+  let reserved_v4_flags = prefix.copy()
+  reserved_v4_flags[8] = b'\x80'
+  assert_eq(
+    decode_rtr_pdu(rtr_bytes(reserved_v4_flags)).unwrap(),
+    Ipv4PrefixPdu(false, rtr_test_vrp()),
+  )
+  let reserved_v6_flags = encode_rtr_pdu(
+      Ipv6PrefixPdu(true, rtr_test_ipv6_vrp()),
+    )
+    .unwrap()
+    .to_array()
+  reserved_v6_flags[2] = b'\xaa'
+  reserved_v6_flags[3] = b'\x55'
+  reserved_v6_flags[8] = b'\x81'
+  reserved_v6_flags[11] = b'\xff'
+  assert_eq(
+    decode_rtr_pdu(rtr_bytes(reserved_v6_flags)).unwrap(),
+    Ipv6PrefixPdu(true, rtr_test_ipv6_vrp()),
   )
 }

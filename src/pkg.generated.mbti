@@ -248,6 +248,7 @@ pub(all) enum RtrPdu {
   ResetQuery
   CacheResponse(Int)
   Ipv4PrefixPdu(Bool, Vrp)
+  Ipv6PrefixPdu(Bool, Ipv6Vrp)
   EndOfData(Int, UInt, UInt, UInt, UInt)
   CacheReset
 } derive(Eq, @debug.Debug)

@@ -42,7 +42,7 @@ implementation. Applications provide VRPs obtained from a trusted validator.
 - strict RFC 8416 JSON parsing with atomic configuration rejection;
 - deterministic RFC 8416 JSON output with parse/write round-trip safety;
 - [RFC 8210](https://www.rfc-editor.org/rfc/rfc8210.html) version 1 control and
-  IPv4 prefix PDU encoding and decoding;
+  IPv4/IPv6 prefix PDU encoding and decoding;
 - portable library code without filesystem or network dependencies.
 
 ## Example
@@ -151,8 +151,8 @@ snapshot while preserving trust-anchor labels and line-numbered diagnostics.
 The older `parse_vrp_csv` remains IPv4-only. Mixed route lists can be read with
 `parse_dual_stack_route_csv`; IPv6 snapshots can be compared with
 `compare_ipv6_snapshots` and assessed with `assess_ipv6_snapshot_impact`.
-RPKI-RTR adapters currently accept IPv4 payloads only. IPv6 text with zone
-identifiers or embedded dotted IPv4 is not accepted by the prefix parser.
+IPv6 text with zone identifiers or embedded dotted IPv4 is not accepted by the
+prefix parser.
 
 The accepted four-column layout follows Routinator's documented
 [`csv` and `csvcompat` formats](https://routinator.docs.nlnetlabs.nl/en/stable/output-formats.html).
@@ -267,15 +267,17 @@ let response = @moonrouteguard.decode_rtr_pdus(received_bytes).unwrap()
 ```
 
 The codec currently supports Serial Notify, Serial Query, Reset Query, Cache
-Response, IPv4 Prefix, End of Data, and Cache Reset PDUs. It validates framing,
-IPv4 payloads, session identifiers, and RFC 8210 timing bounds while preserving
-the protocol's requirement to ignore reserved fields on receipt.
+Response, IPv4 Prefix, IPv6 Prefix, End of Data, and Cache Reset PDUs. It
+validates framing, prefix payloads, session identifiers, and RFC 8210 timing
+bounds while preserving the protocol's requirement to ignore reserved fields
+and flag bits on receipt. It handles bytes only; it does not connect to a cache
+or maintain an RTR session.
 
 ## Next steps
 
-Planned work includes IPv6 support in RPKI-RTR adapters, BGPsec SLURM rules,
-Router Key and Error Report PDUs, and an RPKI-RTR session state machine. These
-capabilities are not part of the current release.
+Planned work includes BGPsec SLURM rules, Router Key and Error Report PDUs, and
+an RPKI-RTR session state machine. These capabilities are not part of the
+current release.
 
 ## License
 

@@ -1,14 +1,28 @@
 ///|
-/// The RFC 8210 version 1 PDUs needed for an IPv4 RPKI-RTR exchange.
+/// RFC 8210 version 1 control and route-origin prefix PDUs.
 ///
 /// Session IDs are represented as `Int` values in the range 0..65535.
 /// Interval values in `EndOfData` are seconds.
+///
+/// # Example
+/// ```mbt check
+/// test {
+///   let prefix = @moonrouteguard.Ipv6Prefix::parse("2001:db8::/32").unwrap()
+///   let vrp = @moonrouteguard.Ipv6Vrp::new(prefix, 48, 64496U).unwrap()
+///   let pdu = @moonrouteguard.RtrPdu::Ipv6PrefixPdu(true, vrp)
+///   assert_eq(
+///     @moonrouteguard.decode_rtr_pdu(@moonrouteguard.encode_rtr_pdu(pdu).unwrap()).unwrap(),
+///     pdu,
+///   )
+/// }
+/// ```
 pub(all) enum RtrPdu {
   SerialNotify(Int, UInt)
   SerialQuery(Int, UInt)
   ResetQuery
   CacheResponse(Int)
   Ipv4PrefixPdu(Bool, Vrp)
+  Ipv6PrefixPdu(Bool, Ipv6Vrp)
   EndOfData(Int, UInt, UInt, UInt, UInt)
   CacheReset
 } derive(Eq, Debug)
@@ -113,6 +127,19 @@ pub fn encode_rtr_pdu(pdu : RtrPdu) -> Result[Bytes, String] {
       rtr_append_u32(output, vrp.prefix().address)
       rtr_append_u32(output, vrp.asn())
     }
+    Ipv6PrefixPdu(announce, vrp) => {
+      let prefix = vrp.prefix()
+      rtr_append_header(output, b'\x06', 0, 32U)
+      output.push(if announce { b'\x01' } else { b'\x00' })
+      output.push(prefix.length().to_byte())
+      output.push(vrp.max_length().to_byte())
+      output.push(b'\x00')
+      rtr_append_u32(output, prefix.first)
+      rtr_append_u32(output, prefix.second)
+      rtr_append_u32(output, prefix.third)
+      rtr_append_u32(output, prefix.fourth)
+      rtr_append_u32(output, vrp.asn())
+    }
     EndOfData(session_id, serial, refresh, retry, expire) => {
       match rtr_validate_session_id(session_id) {
         Err(message) => return Err(message)
@@ -214,9 +241,6 @@ fn decode_rtr_at(data : Bytes, offset : Int) -> Result[(RtrPdu, Int), String] {
         Ok(_) => ()
       }
       let flags = data[offset + 8].to_int()
-      if flags != 0 && flags != 1 {
-        return Err("RPKI-RTR IPv4 prefix flags must be 0 or 1")
-      }
       let prefix_length = data[offset + 9].to_int()
       let max_length = data[offset + 10].to_int()
       if prefix_length > 32 {
@@ -233,7 +257,36 @@ fn decode_rtr_at(data : Bytes, offset : Int) -> Result[(RtrPdu, Int), String] {
         Err(message) =>
           return Err("invalid RPKI-RTR IPv4 prefix PDU: \{message}")
       }
-      Ipv4PrefixPdu(flags == 1, vrp)
+      Ipv4PrefixPdu((flags & 1) == 1, vrp)
+    }
+    6 => {
+      match rtr_expect_length(length, 32) {
+        Err(message) => return Err(message)
+        Ok(_) => ()
+      }
+      let flags = data[offset + 8].to_int()
+      let prefix_length = data[offset + 9].to_int()
+      let max_length = data[offset + 10].to_int()
+      if prefix_length > 128 {
+        return Err("RPKI-RTR IPv6 prefix length must be between 0 and 128")
+      }
+      let prefix : Ipv6Prefix = {
+        first: rtr_read_u32(data, offset + 12),
+        second: rtr_read_u32(data, offset + 16),
+        third: rtr_read_u32(data, offset + 20),
+        fourth: rtr_read_u32(data, offset + 24),
+        length: prefix_length,
+      }
+      if prefix.masked(prefix_length) != prefix {
+        return Err("RPKI-RTR IPv6 prefix has host bits set")
+      }
+      let vrp = match
+        Ipv6Vrp::new(prefix, max_length, rtr_read_u32(data, offset + 28)) {
+        Ok(value) => value
+        Err(message) =>
+          return Err("invalid RPKI-RTR IPv6 prefix PDU: \{message}")
+      }
+      Ipv6PrefixPdu((flags & 1) == 1, vrp)
     }
     7 => {
       match rtr_expect_length(length, 24) {
