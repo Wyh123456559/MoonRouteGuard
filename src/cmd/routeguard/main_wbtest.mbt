@@ -2,6 +2,7 @@
 test "parse command options and file paths" {
   let plain = parse_cli(["old.csv", "new.csv", "routes.csv"]).unwrap()
   assert_eq(plain.fail_on_new_invalid, false)
+  assert_eq(plain.fail_on_valid_loss, false)
   assert_eq(plain.json, false)
   assert_eq(plain.before_slurm_path, None)
   assert_eq(plain.after_slurm_path, None)
@@ -11,6 +12,10 @@ test "parse command options and file paths" {
   ]).unwrap()
   assert_eq(gated.fail_on_new_invalid, true)
   assert_eq(gated.before_path, "old.csv")
+  let valid_loss_gate = parse_cli([
+    "--fail-on-valid-loss", "old.csv", "new.csv", "routes.csv",
+  ]).unwrap()
+  assert_eq(valid_loss_gate.fail_on_valid_loss, true)
   let machine = parse_cli([
     "--fail-on-new-invalid", "--json", "old.csv", "new.csv", "routes.csv",
   ]).unwrap()
@@ -31,6 +36,13 @@ test "parse command options and file paths" {
   assert_eq(parse_cli(["--unknown", "new.csv", "routes.csv"]) is Err(_), true)
   assert_eq(
     parse_cli(["--json", "--json", "old.csv", "new.csv", "routes.csv"])
+    is Err(_),
+    true,
+  )
+  assert_eq(
+    parse_cli([
+      "--fail-on-valid-loss", "--fail-on-valid-loss", "old.csv", "new.csv", "routes.csv",
+    ])
     is Err(_),
     true,
   )
@@ -66,6 +78,7 @@ test "assess CSV snapshots against actual route rows" {
     None,
   ).unwrap()
   assert_eq(report.newly_invalid, 1)
+  assert_eq(report.valid_losses, 1)
   assert_eq(report.text.contains("VRP snapshot: +1 -1"), true)
   assert_eq(
     report.text.contains(
@@ -78,8 +91,39 @@ test "assess CSV snapshots against actual route rows" {
   assert_eq(report.text.contains("after (invalid):"), true)
   assert_eq(report.text.contains("origin ASN mismatch"), true)
   assert_eq(report.json.contains("\"newlyInvalid\":1"), true)
+  assert_eq(report.json.contains("\"validLosses\":1"), true)
   assert_eq(report.json.contains("\"relation\":\"asnMismatch\""), true)
   assert_eq(report.json.contains("\"trustAnchor\":\"arin\""), true)
+}
+
+///|
+test "detect Valid to NotFound without counting a new Invalid route" {
+  let before = "ASN,IP Prefix,Max Length,Trust Anchor\nAS64496,203.0.113.0/24,24,arin\nAS64496,2001:db8::/32,48,ripe\n"
+  let after = "ASN,IP Prefix,Max Length,Trust Anchor\n"
+  let routes = "ASN,IP Prefix\nAS64496,203.0.113.0/24\nAS64496,2001:db8:1::/48\n"
+  let report = assess_csv_inputs(
+    "old.csv",
+    before,
+    "new.csv",
+    after,
+    "routes.csv",
+    routes,
+    None,
+    None,
+    None,
+    None,
+  ).unwrap()
+  assert_eq(report.newly_invalid, 0)
+  assert_eq(report.valid_losses, 2)
+  assert_eq(report.text.contains("valid -> not found"), true)
+  assert_eq(report.text.contains("Routes losing Valid status: 2"), true)
+  assert_eq(report.json.contains("\"newlyInvalid\":0,\"validLosses\":1"), true)
+  assert_eq(
+    report.json.contains(
+      "\"ipv6RouteImpact\":{\"checked\":1,\"changed\":1,\"unchanged\":0,\"newlyInvalid\":0,\"validLosses\":1",
+    ),
+    true,
+  )
 }
 
 ///|

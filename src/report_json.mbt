@@ -149,7 +149,11 @@ fn write_ipv6_assessment_json(
   impact : Ipv6SnapshotImpact,
 ) -> Unit {
   let mut newly_invalid = 0
+  let mut valid_losses = 0
   for change in impact.changed {
+    if change.previous.validity == Valid {
+      valid_losses = valid_losses + 1
+    }
     if change.current.validity == Invalid {
       newly_invalid = newly_invalid + 1
     }
@@ -182,6 +186,8 @@ fn write_ipv6_assessment_json(
   buffer.write_string(impact.unchanged.to_string())
   buffer.write_string(",\"newlyInvalid\":")
   buffer.write_string(newly_invalid.to_string())
+  buffer.write_string(",\"validLosses\":")
+  buffer.write_string(valid_losses.to_string())
   buffer.write_string(",\"changes\":[")
   for index, change in impact.changed {
     if index > 0 {
@@ -211,6 +217,7 @@ fn write_ipv6_assessment_json(
 /// retain their trust-anchor labels. Per-decision covering VRPs do not carry
 /// labels because the validation decision model does not retain their source.
 /// IPv4 and IPv6 SLURM application statistics occupy separate optional fields.
+/// Each route-impact section counts transitions away from Valid as validLosses.
 pub fn write_assessment_json(
   diff : SnapshotDiff,
   impact : SnapshotImpact,
@@ -220,7 +227,11 @@ pub fn write_assessment_json(
 ) -> String {
   let buffer = StringBuilder()
   let mut newly_invalid = 0
+  let mut valid_losses = 0
   for change in impact.changed {
+    if change.previous.validity == Valid {
+      valid_losses = valid_losses + 1
+    }
     if change.current.validity == Invalid {
       newly_invalid = newly_invalid + 1
     }
@@ -274,6 +285,8 @@ pub fn write_assessment_json(
   buffer.write_string(impact.unchanged.to_string())
   buffer.write_string(",\"newlyInvalid\":")
   buffer.write_string(newly_invalid.to_string())
+  buffer.write_string(",\"validLosses\":")
+  buffer.write_string(valid_losses.to_string())
   buffer.write_string(",\"changes\":[")
   for index, change in impact.changed {
     if index > 0 {

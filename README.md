@@ -81,6 +81,7 @@ Run the Node.js command-line example and checks:
 moon run --target js src/cmd/routeguard -- examples/before.csv examples/after.csv examples/routes.csv
 moon run --target js src/cmd/routeguard -- --json examples/before-dual.csv examples/after-dual.csv examples/routes-dual.csv
 moon run --target js src/cmd/routeguard -- --json --slurm examples/slurm-dual.json examples/before-dual.csv examples/after-dual.csv examples/routes-dual.csv
+moon run --target js src/cmd/routeguard -- --fail-on-valid-loss examples/before.csv examples/withdrawn.csv examples/routes.csv
 moon check --target wasm --deny-warn
 moon test --target wasm --deny-warn
 moon test --target js --deny-warn
@@ -122,6 +123,13 @@ route fail the check. The generated Node.js process uses exit code 3 for that
 case and 2 for file or parse errors; `moon run` may normalize nonzero codes to
 1. For CI that needs the exact code, build with `moon build --target js` and run
 `node _build/js/debug/build/cmd/routeguard/routeguard.js` with the same arguments.
+Pass `--fail-on-valid-loss` to also treat a transition from Valid to either
+Invalid or NotFound as a failed check. The two gates can be combined; either
+condition uses exit code 3. The `examples/withdrawn.csv` command above shows a
+Valid-to-NotFound regression that `--fail-on-new-invalid` alone would not stop.
+Text reports show the total number of routes losing Valid status, and each
+address family's JSON `routeImpact` section includes `validLosses` alongside
+`newlyInvalid`.
 The CLI reads mixed IPv4/IPv6 CSV input and requires Node.js; the library
 remains portable across Wasm, Wasm-GC, and JavaScript. CLI reports group IPv4
 and IPv6 transitions by address family rather than preserving interleaved

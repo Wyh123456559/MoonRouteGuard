@@ -42,6 +42,7 @@ struct CliConfig {
   after_path : String
   routes_path : String
   fail_on_new_invalid : Bool
+  fail_on_valid_loss : Bool
   json : Bool
   before_slurm_path : String?
   after_slurm_path : String?
@@ -49,13 +50,14 @@ struct CliConfig {
 
 ///|
 fn usage() -> String {
-  "usage: routeguard [--json] [--fail-on-new-invalid] [--slurm POLICY.json | --before-slurm OLD.json --after-slurm NEW.json] BEFORE.csv AFTER.csv ROUTES.csv"
+  "usage: routeguard [--json] [--fail-on-new-invalid] [--fail-on-valid-loss] [--slurm POLICY.json | --before-slurm OLD.json --after-slurm NEW.json] BEFORE.csv AFTER.csv ROUTES.csv"
 }
 
 ///|
 fn parse_cli(argv : Array[String]) -> Result[CliConfig, String] {
   let mut start = 0
   let mut fail_on_new_invalid = false
+  let mut fail_on_valid_loss = false
   let mut json = false
   let mut shared_slurm_path : String? = None
   let mut before_slurm_path : String? = None
@@ -63,6 +65,8 @@ fn parse_cli(argv : Array[String]) -> Result[CliConfig, String] {
   while start < argv.length() && argv[start].has_prefix("--") {
     if argv[start] == "--fail-on-new-invalid" && !fail_on_new_invalid {
       fail_on_new_invalid = true
+    } else if argv[start] == "--fail-on-valid-loss" && !fail_on_valid_loss {
+      fail_on_valid_loss = true
     } else if argv[start] == "--json" && !json {
       json = true
     } else if (argv[start] == "--slurm" && shared_slurm_path is None) ||
@@ -110,6 +114,7 @@ fn parse_cli(argv : Array[String]) -> Result[CliConfig, String] {
     after_path: argv[start + 1],
     routes_path: argv[start + 2],
     fail_on_new_invalid,
+    fail_on_valid_loss,
     json,
     before_slurm_path,
     after_slurm_path,
@@ -133,6 +138,7 @@ struct CliReport {
   text : String
   json : String
   newly_invalid : Int
+  valid_losses : Int
 }
 
 ///|
@@ -267,7 +273,11 @@ fn assess_csv_inputs(
     report.write_string("IPv6 route impact: \{ipv6_impact.summary()}\n")
   }
   let mut newly_invalid = 0
+  let mut valid_losses = 0
   for change in impact.changed {
+    if change.previous.validity == @lib.Valid {
+      valid_losses = valid_losses + 1
+    }
     if change.current.validity == @lib.Invalid {
       newly_invalid = newly_invalid + 1
       report.write_string("NEW INVALID: ")
@@ -276,6 +286,9 @@ fn assess_csv_inputs(
     report.write_string("\n")
   }
   for change in ipv6_impact.changed {
+    if change.previous.validity == @lib.Valid {
+      valid_losses = valid_losses + 1
+    }
     if change.current.validity == @lib.Invalid {
       newly_invalid = newly_invalid + 1
       report.write_string("NEW INVALID: ")
@@ -284,6 +297,7 @@ fn assess_csv_inputs(
     report.write_string("\n")
   }
   report.write_string("Newly invalid routes: \{newly_invalid}\n")
+  report.write_string("Routes losing Valid status: \{valid_losses}\n")
   let has_policy = previous.stats is Some(_) || current.stats is Some(_)
   let json = if has_policy && has_ipv6 {
     @lib.write_assessment_json(
@@ -304,7 +318,7 @@ fn assess_csv_inputs(
   } else {
     @lib.write_assessment_json(diff, impact)
   }
-  Ok({ text: report.to_string(), json, newly_invalid, })
+  Ok({ text: report.to_string(), json, newly_invalid, valid_losses, })
 }
 
 ///|
@@ -408,7 +422,8 @@ fn main {
       } else {
         node_write_output(report.text)
       }
-      if config.fail_on_new_invalid && report.newly_invalid > 0 {
+      if (config.fail_on_new_invalid && report.newly_invalid > 0) ||
+        (config.fail_on_valid_loss && report.valid_losses > 0) {
         node_set_exit_code(3)
       }
     }
