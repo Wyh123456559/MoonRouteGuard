@@ -54,6 +54,11 @@ fn usage() -> String {
 }
 
 ///|
+fn help_requested(argv : Array[String]) -> Bool {
+  argv.length() == 1 && (argv[0] == "--help" || argv[0] == "-h")
+}
+
+///|
 fn parse_cli(argv : Array[String]) -> Result[CliConfig, String] {
   let mut start = 0
   let mut fail_on_new_invalid = false
@@ -349,6 +354,10 @@ fn main {
   let inputs : Array[String] = []
   for index = 2; index < argv.length(); index = index + 1 {
     inputs.push(argv[index])
+  }
+  if help_requested(inputs) {
+    node_write_output("\{usage()}\n")
+    return
   }
   let config = match parse_cli(inputs) {
     Ok(config) => config

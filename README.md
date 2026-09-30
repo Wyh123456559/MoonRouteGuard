@@ -8,6 +8,22 @@ The library intentionally starts after cryptographic RPKI validation. It does
 not fetch repositories, validate certificates, or replace an RPKI relying-party
 implementation. Applications provide VRPs obtained from a trusted validator.
 
+## Run locally
+
+Install MoonBit and Node.js, then clone the repository:
+
+```text
+git clone https://github.com/Wyh123456559/MoonRouteGuard.git
+cd MoonRouteGuard
+moon test --target js
+moon run --target js src/cmd/routeguard -- --help
+moon run --target js src/cmd/routeguard -- examples/before.csv examples/after.csv examples/routes.csv
+```
+
+The library package is portable; Node.js is only needed for the file-reading
+command-line program. This repository has not yet been published to Mooncakes,
+so use the source checkout until a package release is available.
+
 ## What works
 
 - strict parsing of canonical IPv4 CIDR prefixes;
@@ -130,6 +146,8 @@ Valid-to-NotFound regression that `--fail-on-new-invalid` alone would not stop.
 Text reports show the total number of routes losing Valid status, and each
 address family's JSON `routeImpact` section includes `validLosses` alongside
 `newlyInvalid`.
+Both gates inspect only the supplied route CSV. A successful check is not a
+claim that every route in the global BGP table has been assessed.
 The CLI reads mixed IPv4/IPv6 CSV input and requires Node.js; the library
 remains portable across Wasm, Wasm-GC, and JavaScript. CLI reports group IPv4
 and IPv6 transitions by address family rather than preserving interleaved

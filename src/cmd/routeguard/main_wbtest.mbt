@@ -1,5 +1,9 @@
 ///|
 test "parse command options and file paths" {
+  assert_eq(help_requested(["--help"]), true)
+  assert_eq(help_requested(["-h"]), true)
+  assert_eq(help_requested(["--help", "old.csv"]), false)
+  assert_eq(help_requested([]), false)
   let plain = parse_cli(["old.csv", "new.csv", "routes.csv"]).unwrap()
   assert_eq(plain.fail_on_new_invalid, false)
   assert_eq(plain.fail_on_valid_loss, false)
